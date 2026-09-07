@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import SearchSelect from "@/components/SearchSelect";
+import { useCallback, useEffect, useRef, useState } from "react";
+import SearchSelect, { SearchSelectHandle } from "@/components/SearchSelect";
 import { ApiError } from "@/lib/api";
 import { Client } from "@/features/clients/clients.types";
 import { fetchAllClients } from "@/features/clients/clients.api";
@@ -14,7 +14,7 @@ const DRAFT_KEY = "invoice_draft";
 
 interface LineItem {
   product_id: number;
-  quantity: number;
+  quantity: number | "";
   saleUnit: "unite" | "carton";
   unitPriceOverride: string;
   // Forme vendue (principale/secondaire) pour un article transformable ;
@@ -40,15 +40,13 @@ function loadDraft(): Draft | null {
 }
 
 function linesFromInvoice(invoice: Invoice): LineItem[] {
-  return invoice.lines.length > 0
-    ? invoice.lines.map((l) => ({
-        product_id: l.product_id,
-        quantity: l.quantity,
-        saleUnit: "unite" as const,
-        unitPriceOverride: String(l.unit_price),
-        form: (l.form as ProductForm) || "principale",
-      }))
-    : [defaultLine()];
+  return invoice.lines.map((l) => ({
+    product_id: l.product_id,
+    quantity: l.quantity,
+    saleUnit: "unite" as const,
+    unitPriceOverride: String(l.unit_price),
+    form: (l.form as ProductForm) || "principale",
+  }));
 }
 
 export default function InvoiceForm({
@@ -63,10 +61,15 @@ export default function InvoiceForm({
   const [clients, setClients] = useState<Client[]>([]);
   const [clientId, setClientId] = useState<number | "">(invoice?.client_id || "");
   const [clientName, setClientName] = useState(invoice?.client_name || "");
-  const [lines, setLines] = useState<LineItem[]>(invoice ? linesFromInvoice(invoice) : [defaultLine()]);
+  const [lines, setLines] = useState<LineItem[]>(invoice ? linesFromInvoice(invoice) : []);
+  const [editor, setEditor] = useState<LineItem>(defaultLine());
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const articleRef = useRef<SearchSelectHandle>(null);
+  const quantityRef = useRef<HTMLInputElement>(null);
+  const priceRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     Promise.all([fetchAllProducts(), fetchAllClients()]).then(([p, c]) => {
@@ -77,7 +80,7 @@ export default function InvoiceForm({
       if (draft) {
         setClientId(draft.clientId);
         setClientName(draft.clientName);
-        setLines(draft.lines.length > 0 ? draft.lines : [defaultLine()]);
+        setLines(draft.lines);
         setDraftRestored(true);
       }
     });
@@ -102,20 +105,35 @@ export default function InvoiceForm({
     saveDraft(clientId, name, lines);
   }
 
-  function updateLine(index: number, patch: Partial<LineItem>) {
-    setLines((prev) => {
-      const next = prev.map((l, i) => (i === index ? { ...l, ...patch } : l));
-      saveDraft(clientId, clientName, next);
-      return next;
-    });
+  function updateEditor(patch: Partial<LineItem>) {
+    setEditor((prev) => ({ ...prev, ...patch }));
   }
 
-  function addLine() {
+  function commitEditorLine() {
+    if (!editor.product_id || editor.quantity === "" || editor.quantity <= 0) {
+      setError("Choisissez un article et une quantité valide");
+      return;
+    }
+    setError("");
     setLines((prev) => {
-      const next = [...prev, defaultLine()];
+      const next = editingIndex !== null ? prev.map((l, i) => (i === editingIndex ? editor : l)) : [...prev, editor];
       saveDraft(clientId, clientName, next);
       return next;
     });
+    setEditor(defaultLine());
+    setEditingIndex(null);
+    articleRef.current?.focus();
+  }
+
+  function editLine(index: number) {
+    setEditor(lines[index]);
+    setEditingIndex(index);
+    setError("");
+  }
+
+  function cancelEdit() {
+    setEditor(defaultLine());
+    setEditingIndex(null);
   }
 
   function removeLine(index: number) {
@@ -124,13 +142,15 @@ export default function InvoiceForm({
       saveDraft(clientId, clientName, next);
       return next;
     });
+    if (editingIndex === index) cancelEdit();
   }
 
   function clearDraft() {
     localStorage.removeItem(DRAFT_KEY);
     setClientId("");
     setClientName("");
-    setLines([defaultLine()]);
+    setLines([]);
+    cancelEdit();
     setDraftRestored(false);
   }
 
@@ -138,10 +158,15 @@ export default function InvoiceForm({
     return products.find((p) => p.id === id);
   }
 
+  function numericQuantity(quantity: number | ""): number {
+    return quantity === "" ? 0 : quantity;
+  }
+
   function baseQuantity(line: LineItem) {
     const product = productOf(line.product_id);
     const packSize = product?.pack_size || 1;
-    return line.saleUnit === "carton" ? line.quantity * packSize : line.quantity;
+    const qty = numericQuantity(line.quantity);
+    return line.saleUnit === "carton" ? qty * packSize : qty;
   }
 
   function effectiveUnitPrice(line: LineItem) {
@@ -162,12 +187,22 @@ export default function InvoiceForm({
     return product.quantity;
   }
 
+  function unitLabel(line: LineItem) {
+    const product = productOf(line.product_id);
+    if (!product) return "";
+    if ((product.pack_size || 1) > 1) return line.saleUnit === "carton" ? "Carton" : "Unité";
+    if (product.is_transformable) return line.form === "secondaire" ? product.unit_secondaire : product.unit;
+    return product.unit || "";
+  }
+
   const total = lines.reduce((sum, l) => sum + effectiveUnitPrice(l) * baseQuantity(l), 0);
+  const editorProduct = productOf(editor.product_id);
+  const editorHasPack = (editorProduct?.pack_size || 1) > 1;
 
   async function onSubmit() {
     setError("");
     const validLines = lines
-      .filter((l) => l.product_id && l.quantity > 0)
+      .filter((l) => l.product_id && l.quantity !== "" && l.quantity > 0)
       .map((l) => {
         const override = l.unitPriceOverride !== "" ? parseFloat(l.unitPriceOverride) : NaN;
         const product = productOf(l.product_id);
@@ -230,104 +265,150 @@ export default function InvoiceForm({
         />
       </div>
 
+      {/* Éditeur de ligne (unique) */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Articles</label>
-        <div className="space-y-3">
-          {lines.map((line, i) => {
-            const product = productOf(line.product_id);
-            const unitPrice = effectiveUnitPrice(line);
-            const lineTotal = unitPrice * baseQuantity(line);
-            const hasPack = (product?.pack_size || 1) > 1;
-            return (
-              <div key={i} className="grid grid-cols-12 gap-2 items-center border-b pb-3">
-                <div className="col-span-12 sm:col-span-4">
-                  <SearchSelect
-                    options={products.map((p) => ({
-                      id: p.id,
-                      label: p.name,
-                      sublabel: p.is_transformable
-                        ? `${p.quantity} ${p.unit} / ${p.quantity_secondaire} ${p.unit_secondaire} dispo.`
-                        : `${p.quantity} dispo.${p.pack_size > 1 ? ` — carton ${p.pack_size}` : ""}`,
-                    }))}
-                    value={line.product_id || ""}
-                    onChange={(id) => {
-                      const p = products.find((pr) => pr.id === id);
-                      updateLine(i, {
-                        product_id: id || 0,
-                        saleUnit: "unite",
-                        form: "principale",
-                        unitPriceOverride: p ? String(p.unit_price) : "",
-                      });
-                    }}
-                    placeholder="Article..."
-                  />
-                </div>
 
-                {hasPack ? (
-                  <select
-                    value={line.saleUnit}
-                    onChange={(e) => updateLine(i, { saleUnit: e.target.value as "unite" | "carton" })}
-                    className="col-span-6 sm:col-span-2 rounded-md border border-gray-300 px-2 py-2 text-sm"
-                  >
-                    <option value="unite">Unité</option>
-                    <option value="carton">Carton</option>
-                  </select>
-                ) : product?.is_transformable ? (
-                  <select
-                    value={line.form}
-                    onChange={(e) => {
-                      const f = e.target.value as ProductForm;
-                      const price = f === "secondaire" ? product.unit_price_secondaire : product.unit_price;
-                      updateLine(i, { form: f, unitPriceOverride: price != null ? String(price) : "" });
-                    }}
-                    className="col-span-6 sm:col-span-2 rounded-md border border-gray-300 px-2 py-2 text-sm"
-                  >
-                    <option value="principale">{product.unit}</option>
-                    <option value="secondaire">{product.unit_secondaire}</option>
-                  </select>
-                ) : (
-                  <div className="hidden sm:block sm:col-span-2" />
-                )}
+        <div className="grid grid-cols-12 gap-2 items-center">
+          <div className="col-span-12 sm:col-span-5">
+            <SearchSelect
+              ref={articleRef}
+              options={products.map((p) => ({
+                id: p.id,
+                label: p.name,
+                sublabel: p.is_transformable
+                  ? `${p.quantity} ${p.unit} / ${p.quantity_secondaire} ${p.unit_secondaire} dispo.`
+                  : `${p.quantity} dispo.${p.pack_size > 1 ? ` — carton ${p.pack_size}` : ""}`,
+              }))}
+              value={editor.product_id || ""}
+              onChange={(id) => {
+                const p = products.find((pr) => pr.id === id);
+                updateEditor({
+                  product_id: id || 0,
+                  saleUnit: "unite",
+                  form: "principale",
+                  unitPriceOverride: p ? String(p.unit_price) : "",
+                });
+              }}
+              onEnter={() => quantityRef.current?.focus()}
+              placeholder="Article..."
+            />
+          </div>
 
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={line.quantity}
-                  onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
-                  className={`col-span-3 sm:col-span-2 rounded-md border px-2 py-2 text-sm ${
-                    product && (availableStock(line) ?? 0) < line.quantity ? "border-red-400 text-red-600" : "border-gray-300"
-                  }`}
-                  placeholder="Qté"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={line.unitPriceOverride}
-                  onChange={(e) => updateLine(i, { unitPriceOverride: e.target.value })}
-                  className="col-span-4 sm:col-span-2 rounded-md border border-gray-300 px-2 py-2 text-sm"
-                  placeholder="Prix U"
-                />
-                <div className="col-span-4 sm:col-span-1 text-sm text-gray-600 text-right font-medium tabular-nums">
-                  {lineTotal.toLocaleString()}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeLine(i)}
-                  className="col-span-1 text-red-500 hover:text-red-700 text-center text-lg font-bold"
-                  title="Supprimer"
-                >
-                  ×
-                </button>
-              </div>
-            );
-          })}
+          {editorHasPack ? (
+            <select
+              value={editor.saleUnit}
+              onChange={(e) => updateEditor({ saleUnit: e.target.value as "unite" | "carton" })}
+              className="col-span-6 sm:col-span-2 rounded-md border border-gray-300 px-2 py-2 text-sm"
+            >
+              <option value="unite">Unité</option>
+              <option value="carton">Carton</option>
+            </select>
+          ) : editorProduct?.is_transformable ? (
+            <select
+              value={editor.form}
+              onChange={(e) => {
+                const f = e.target.value as ProductForm;
+                const price = f === "secondaire" ? editorProduct.unit_price_secondaire : editorProduct.unit_price;
+                updateEditor({ form: f, unitPriceOverride: price != null ? String(price) : "" });
+              }}
+              className="col-span-6 sm:col-span-2 rounded-md border border-gray-300 px-2 py-2 text-sm"
+            >
+              <option value="principale">{editorProduct.unit}</option>
+              <option value="secondaire">{editorProduct.unit_secondaire}</option>
+            </select>
+          ) : (
+            <div className="hidden sm:block sm:col-span-2" />
+          )}
+
+          <input
+            ref={quantityRef}
+            type="number"
+            step="0.1"
+            min="1"
+            value={editor.quantity}
+            onChange={(e) => updateEditor({ quantity: e.target.value === "" ? "" : Number(e.target.value) })}
+            onFocus={(e) => e.target.select()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                priceRef.current?.focus();
+              }
+            }}
+            className={`col-span-3 sm:col-span-1 rounded-md border px-2 py-2 text-sm ${
+              editorProduct && (availableStock(editor) ?? 0) < (editor.quantity || 0) ? "border-red-400 text-red-600" : "border-gray-300"
+            }`}
+            placeholder="Qté"
+          />
+          <input
+            ref={priceRef}
+            type="number"
+            step="1"
+            min="0"
+            value={editor.unitPriceOverride}
+            onChange={(e) => updateEditor({ unitPriceOverride: e.target.value })}
+            onFocus={(e) => e.target.select()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitEditorLine();
+              }
+            }}
+            className="col-span-5 sm:col-span-2 rounded-md border border-gray-300 px-2 py-2 text-sm"
+            placeholder="Prix U"
+          />
+          <div className="col-span-4 sm:col-span-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={commitEditorLine}
+              className="w-full bg-blue-600 text-white rounded-md px-3 py-2 text-sm font-medium hover:bg-blue-700"
+            >
+              {editingIndex !== null ? "Modifier" : "+ Ajouter"}
+            </button>
+          </div>
         </div>
+        {editingIndex !== null && (
+          <button type="button" onClick={cancelEdit} className="mt-2 text-xs text-gray-500 hover:underline">
+            Annuler la modification
+          </button>
+        )}
 
-        <button type="button" onClick={addLine} className="mt-3 text-blue-600 text-sm hover:underline">
-          + Ajouter une ligne
-        </button>
+        {/* Liste des articles ajoutés */}
+        {lines.length > 0 && (
+          <div className="mt-4 divide-y border rounded-lg overflow-hidden">
+            {lines.map((line, i) => {
+              const product = productOf(line.product_id);
+              const unitPrice = effectiveUnitPrice(line);
+              const lineTotal = unitPrice * baseQuantity(line);
+              return (
+                <div
+                  key={i}
+                  onClick={() => editLine(i)}
+                  className={`grid grid-cols-12 gap-2 items-center px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 ${
+                    editingIndex === i ? "bg-blue-50" : ""
+                  }`}
+                >
+                  <div className="col-span-5 sm:col-span-4 truncate font-medium">{product?.name || "—"}</div>
+                  <div className="col-span-3 sm:col-span-2 text-gray-500">{unitLabel(line)}</div>
+                  <div className="hidden sm:block sm:col-span-1 text-right tabular-nums">{numericQuantity(line.quantity)}</div>
+                  <div className="col-span-2 text-right tabular-nums text-gray-600">{unitPrice.toLocaleString()}</div>
+                  <div className="col-span-2 sm:col-span-2 text-right tabular-nums font-medium">{lineTotal.toLocaleString()}</div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeLine(i);
+                    }}
+                    className="col-span-1 text-red-500 hover:text-red-700 text-center text-sm"
+                    title="Supprimer"
+                  >
+                    × suppr
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between border-t pt-4">

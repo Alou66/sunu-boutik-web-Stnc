@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 interface Option {
   id: number;
@@ -8,32 +8,52 @@ interface Option {
   sublabel?: string;
 }
 
-export default function SearchSelect({
-  options,
-  value,
-  onChange,
-  placeholder,
-  allowEmpty,
-  emptyLabel,
-  className = "",
-  allowFreeText,
-  freeTextValue,
-  onFreeTextChange,
-}: {
-  options: Option[];
-  value?: number | "";
-  onChange?: (id: number | "") => void;
-  placeholder?: string;
-  allowEmpty?: boolean;
-  emptyLabel?: string;
-  className?: string;
-  allowFreeText?: boolean;
-  freeTextValue?: string;
-  onFreeTextChange?: (text: string) => void;
-}) {
+export interface SearchSelectHandle {
+  focus: () => void;
+}
+
+const SearchSelect = forwardRef<
+  SearchSelectHandle,
+  {
+    options: Option[];
+    value?: number | "";
+    onChange?: (id: number | "") => void;
+    placeholder?: string;
+    allowEmpty?: boolean;
+    emptyLabel?: string;
+    className?: string;
+    allowFreeText?: boolean;
+    freeTextValue?: string;
+    onFreeTextChange?: (text: string) => void;
+    // Appelé quand l'utilisateur appuie sur Entrée (après sélection éventuelle),
+    // pour permettre au parent de déplacer le focus vers le champ suivant.
+    onEnter?: () => void;
+  }
+>(function SearchSelect(
+  {
+    options,
+    value,
+    onChange,
+    placeholder,
+    allowEmpty,
+    emptyLabel,
+    className = "",
+    allowFreeText,
+    freeTextValue,
+    onFreeTextChange,
+    onEnter,
+  },
+  ref
+) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+  }));
 
   const selected = options.find((o) => o.id === value);
 
@@ -61,9 +81,50 @@ export default function SearchSelect({
 
   const filtered = options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()));
 
+  useEffect(() => {
+    setHighlight(0);
+  }, [query, open]);
+
+  function selectOption(o: Option) {
+    if (onChange) {
+      onChange(o.id);
+      if (allowFreeText) onFreeTextChange?.("");
+    } else if (allowFreeText) {
+      onFreeTextChange?.(o.label);
+    }
+    setQuery(o.label);
+    setOpen(false);
+    // La liste se démonte à la fermeture : le focus (posé sur le bouton cliqué)
+    // serait sinon perdu, empêchant toute suite au clavier. On l'enchaîne nous-même.
+    onEnter?.();
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setOpen(true);
+      setHighlight((h) => Math.min(h + 1, filtered.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => Math.max(h - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (open && filtered.length > 0) {
+        selectOption(filtered[Math.max(highlight, 0)]);
+      } else {
+        setOpen(false);
+        onEnter?.();
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      if (selected) setQuery(selected.label);
+    }
+  }
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <input
+        ref={inputRef}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -72,6 +133,7 @@ export default function SearchSelect({
           if (allowFreeText) onFreeTextChange?.(e.target.value);
         }}
         onFocus={() => setOpen(true)}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         className="w-full rounded-md border border-gray-300 px-3 py-2"
       />
@@ -80,7 +142,10 @@ export default function SearchSelect({
           {allowEmpty && (
             <button
               type="button"
-              onMouseDown={() => {
+              onMouseDown={(e) => {
+                // Empêche le navigateur de redonner le focus à ce bouton (comportement
+                // par défaut du mousedown), ce qui écraserait le focus posé ensuite.
+                e.preventDefault();
                 onChange?.("");
                 setQuery("");
                 setOpen(false);
@@ -91,21 +156,15 @@ export default function SearchSelect({
             </button>
           )}
           {filtered.length === 0 && <p className="px-3 py-2 text-sm text-gray-400">Aucun résultat</p>}
-          {filtered.map((o) => (
+          {filtered.map((o, i) => (
             <button
               key={o.id}
               type="button"
-              onMouseDown={() => {
-                if (onChange) {
-                  onChange(o.id);
-                  if (allowFreeText) onFreeTextChange?.("");
-                } else if (allowFreeText) {
-                  onFreeTextChange?.(o.label);
-                }
-                setQuery(o.label);
-                setOpen(false);
+              onMouseDown={(e) => {
+                e.preventDefault();
+                selectOption(o);
               }}
-              className="block w-full text-left px-3 py-2 text-sm hover:bg-blue-50"
+              className={`block w-full text-left px-3 py-2 text-sm ${i === highlight ? "bg-blue-50" : "hover:bg-blue-50"}`}
             >
               {o.label}
               {o.sublabel && <span className="block text-xs text-gray-400">{o.sublabel}</span>}
@@ -115,4 +174,6 @@ export default function SearchSelect({
       )}
     </div>
   );
-}
+});
+
+export default SearchSelect;
