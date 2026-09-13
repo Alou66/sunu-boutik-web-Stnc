@@ -291,7 +291,7 @@ export default function InvoiceCopiesView({
   const heureStr = dateObj.toLocaleTimeString("fr-FR");
   // Même règle que le PDF Ticket/A4 (backend: invoices.py) : nom + téléphone du client lié,
   // sinon le nom libre saisi sur la facture.
-  const clientLabel = client ? client.name + (client.phone ? ` - ${client.phone}` : "") : invoice.client_name || "";
+  const clientLabel = client ? client.name + (client.phone ? ` - ${client.phone}` : "") : invoice.client_name || "Client Divers";
   const clientAddress = client?.address || "";
   const totalQty = invoice.lines.reduce((s, l) => s + l.quantity, 0);
   const phones = [shop.phone, shop.phone2, shop.phone3].filter(Boolean).join(" - ");

@@ -1,19 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { statusColors, statusLabels } from "./admin.constants";
 import { useAdminDashboard } from "./admin.hooks";
-
-const statusLabels: Record<string, string> = {
-  pending: "En attente",
-  approved: "Validée",
-  rejected: "Rejetée",
-};
-
-const statusColors: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-800",
-  approved: "bg-green-100 text-green-800",
-  rejected: "bg-red-100 text-red-800",
-};
 
 export default function AdminDashboardPage() {
   const { overview, recent, loading, error } = useAdminDashboard();
@@ -29,6 +18,7 @@ export default function AdminDashboardPage() {
           <StatCard label="Boutiques" value={overview.total_shops} />
           <StatCard label="En attente" value={overview.pending_shops} highlight />
           <StatCard label="Validées" value={overview.approved_shops} />
+          <StatCard label="Suspendues" value={overview.suspended_shops} />
           <StatCard label="Chiffre d'affaires global" value={`${overview.total_revenue.toLocaleString()} FCFA`} />
         </div>
       )}

@@ -3,7 +3,7 @@ export interface ShopAdmin {
   name: string;
   address?: string | null;
   phone?: string | null;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "suspended";
   created_at: string;
   reviewed_at?: string | null;
   owner_email?: string | null;
@@ -34,6 +34,7 @@ export interface Overview {
   pending_shops: number;
   approved_shops: number;
   rejected_shops: number;
+  suspended_shops: number;
   total_invoices: number;
   total_revenue: number;
 }

@@ -5,6 +5,7 @@ export interface Product {
   category_name: string;
   reference?: string | null;
   unit_price: number;
+  purchase_price: number;
   quantity: number;
   unit: string;
   pack_size: number;
@@ -12,6 +13,7 @@ export interface Product {
   unit_secondaire?: string | null;
   conversion_ratio?: number | null;
   unit_price_secondaire?: number | null;
+  purchase_price_secondaire?: number | null;
   quantity_secondaire: number;
   created_at: string;
 }
