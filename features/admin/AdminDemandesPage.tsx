@@ -3,34 +3,37 @@
 import { useState } from "react";
 import Modal from "@/components/Modal";
 import { ApiError } from "@/lib/api";
-import { approveShop, rejectShop } from "./admin.api";
+import { statusColors, statusLabels } from "./admin.constants";
+import {
+  approveShop,
+  reactivateShop,
+  rejectShop,
+  resetOwnerPassword,
+  suspendShop,
+} from "./admin.api";
 import { useAdminShops, useShopStats } from "./admin.hooks";
 import { ShopAdmin } from "./admin.types";
-
-const statusLabels: Record<string, string> = {
-  pending: "En attente",
-  approved: "Validée",
-  rejected: "Rejetée",
-};
-
-const statusColors: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-800",
-  approved: "bg-green-100 text-green-800",
-  rejected: "bg-red-100 text-red-800",
-};
 
 const PAGE_SIZE = 8;
 
 export default function AdminDemandesPage() {
   const [filter, setFilter] = useState<string>("");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
-  const { shops, total, totalPages, loading, error, reload } = useAdminShops(page, PAGE_SIZE, filter || undefined);
+  const { shops, total, totalPages, loading, error, reload } = useAdminShops(
+    page,
+    PAGE_SIZE,
+    filter || undefined,
+    search || undefined
+  );
 
   const [managingShop, setManagingShop] = useState<ShopAdmin | null>(null);
   const { stats, loading: statsLoading, load: loadStats } = useShopStats();
   const [rejectReason, setRejectReason] = useState("");
+  const [suspendReason, setSuspendReason] = useState("");
   const [actionError, setActionError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
   function changeFilter(value: string) {
@@ -38,10 +41,17 @@ export default function AdminDemandesPage() {
     setPage(1);
   }
 
+  function changeSearch(value: string) {
+    setSearch(value);
+    setPage(1);
+  }
+
   function openManage(shop: ShopAdmin) {
     setManagingShop(shop);
     setRejectReason("");
+    setSuspendReason("");
     setActionError("");
+    setActionMessage("");
     loadStats(shop.id);
   }
 
@@ -49,31 +59,50 @@ export default function AdminDemandesPage() {
     setManagingShop(null);
   }
 
-  async function approve() {
-    if (!managingShop) return;
+  async function runAction(action: () => Promise<unknown>, fallbackError: string, closeOnSuccess = true) {
     setActionLoading(true);
     setActionError("");
     try {
-      await approveShop(managingShop.id);
-      closeManage();
+      await action();
+      if (closeOnSuccess) closeManage();
       await reload();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Erreur lors de la validation");
+      setActionError(err instanceof ApiError ? err.message : fallbackError);
     } finally {
       setActionLoading(false);
     }
   }
 
+  async function approve() {
+    if (!managingShop) return;
+    await runAction(() => approveShop(managingShop.id), "Erreur lors de la validation");
+  }
+
   async function reject() {
+    if (!managingShop) return;
+    await runAction(() => rejectShop(managingShop.id, rejectReason || null), "Erreur lors du rejet");
+  }
+
+  async function suspend() {
+    if (!managingShop) return;
+    await runAction(() => suspendShop(managingShop.id, suspendReason || null), "Erreur lors de la suspension");
+  }
+
+  async function reactivate() {
+    if (!managingShop) return;
+    await runAction(() => reactivateShop(managingShop.id), "Erreur lors de la réactivation");
+  }
+
+  async function resetPassword() {
     if (!managingShop) return;
     setActionLoading(true);
     setActionError("");
+    setActionMessage("");
     try {
-      await rejectShop(managingShop.id, rejectReason || null);
-      closeManage();
-      await reload();
+      const res = await resetOwnerPassword(managingShop.id);
+      setActionMessage(res.message);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Erreur lors du rejet");
+      setActionError(err instanceof ApiError ? err.message : "Erreur lors de la réinitialisation");
     } finally {
       setActionLoading(false);
     }
@@ -83,16 +112,25 @@ export default function AdminDemandesPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-gray-900">Demandes</h1>
-        <select
-          value={filter}
-          onChange={(e) => changeFilter(e.target.value)}
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-        >
-          <option value="">Toutes</option>
-          <option value="pending">En attente</option>
-          <option value="approved">Validées</option>
-          <option value="rejected">Rejetées</option>
-        </select>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={search}
+            onChange={(e) => changeSearch(e.target.value)}
+            placeholder="Rechercher une boutique ou un propriétaire..."
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm w-64"
+          />
+          <select
+            value={filter}
+            onChange={(e) => changeFilter(e.target.value)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="">Toutes</option>
+            <option value="pending">En attente</option>
+            <option value="approved">Validées</option>
+            <option value="suspended">Suspendues</option>
+            <option value="rejected">Rejetées</option>
+          </select>
+        </div>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -209,6 +247,7 @@ export default function AdminDemandesPage() {
             </div>
 
             {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+            {actionMessage && <p className="text-sm text-green-600">{actionMessage}</p>}
 
             {managingShop.status === "pending" && (
               <div className="border-t pt-4 space-y-3">
@@ -234,6 +273,43 @@ export default function AdminDemandesPage() {
                     Rejeter
                   </button>
                 </div>
+              </div>
+            )}
+
+            {managingShop.status === "approved" && (
+              <div className="border-t pt-4 space-y-3">
+                <button
+                  onClick={resetPassword}
+                  disabled={actionLoading}
+                  className="w-full bg-gray-100 text-gray-800 rounded-md py-2 text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
+                >
+                  Réinitialiser le mot de passe du propriétaire
+                </button>
+                <input
+                  placeholder="Motif de la suspension (optionnel)"
+                  value={suspendReason}
+                  onChange={(e) => setSuspendReason(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+                <button
+                  onClick={suspend}
+                  disabled={actionLoading}
+                  className="w-full bg-amber-600 text-white rounded-md py-2 text-sm font-medium hover:bg-amber-700 disabled:opacity-50"
+                >
+                  Suspendre la boutique
+                </button>
+              </div>
+            )}
+
+            {managingShop.status === "suspended" && (
+              <div className="border-t pt-4">
+                <button
+                  onClick={reactivate}
+                  disabled={actionLoading}
+                  className="w-full bg-green-600 text-white rounded-md py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                >
+                  Réactiver la boutique
+                </button>
               </div>
             )}
           </div>

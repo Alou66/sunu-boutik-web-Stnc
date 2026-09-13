@@ -29,7 +29,7 @@ export function useAdminDashboard() {
   return { overview, recent, loading, error };
 }
 
-export function useAdminShops(page: number, pageSize: number, statusFilter?: string) {
+export function useAdminShops(page: number, pageSize: number, statusFilter?: string, search?: string) {
   const [shops, setShops] = useState<ShopAdmin[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -40,7 +40,7 @@ export function useAdminShops(page: number, pageSize: number, statusFilter?: str
     setLoading(true);
     setError("");
     try {
-      const list = await fetchShops(page, pageSize, statusFilter);
+      const list = await fetchShops(page, pageSize, statusFilter, search);
       setShops(list.items);
       setTotal(list.total);
       setTotalPages(list.total_pages);
@@ -49,7 +49,7 @@ export function useAdminShops(page: number, pageSize: number, statusFilter?: str
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, statusFilter]);
+  }, [page, pageSize, statusFilter, search]);
 
   useEffect(() => {
     reload();

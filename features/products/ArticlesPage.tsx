@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import Modal from "@/components/Modal";
 import SearchBar from "@/components/SearchBar";
 import SearchSelect from "@/components/SearchSelect";
@@ -11,18 +12,19 @@ import { Category } from "@/features/categories/categories.types";
 import { useAllCategories } from "@/features/categories/categories.hooks";
 import { Product } from "./products.types";
 import { createProduct, deleteProduct, updateProduct } from "./products.api";
-import { useAllProducts, useProducts, useProductStats } from "./products.hooks";
+import { useAllProducts, useProducts } from "./products.hooks";
 
 const emptyForm = {
   name: "",
   category_id: "" as number | "",
   unit_price: "",
-  quantity: "",
+  purchase_price: "",
   is_transformable: false,
   unit_principale: "",
   unit_secondaire: "",
   conversion_ratio: "",
   unit_price_secondaire: "",
+  purchase_price_secondaire: "",
 };
 
 export default function ArticlesPage() {
@@ -35,17 +37,10 @@ export default function ArticlesPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingQuantitySecondaire, setEditingQuantitySecondaire] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
-
-  const [showStats, setShowStats] = useState(false);
-  const { stats, loading: statsLoading, error: statsError, load: loadStats } = useProductStats();
-
-  function openStats() {
-    setShowStats(true);
-    loadStats();
-  }
 
   function onSearchChange(value: string) {
     setSearch(value);
@@ -54,6 +49,7 @@ export default function ArticlesPage() {
 
   function openCreate() {
     setEditingId(null);
+    setEditingProduct(null);
     setForm(emptyForm);
     setEditingQuantitySecondaire(0);
     setFormError("");
@@ -62,16 +58,18 @@ export default function ArticlesPage() {
 
   function openEdit(p: Product) {
     setEditingId(p.id);
+    setEditingProduct(p);
     setForm({
       name: p.name,
       category_id: p.category_id,
       unit_price: String(p.unit_price),
-      quantity: String(p.quantity),
+      purchase_price: String(p.purchase_price),
       is_transformable: p.is_transformable,
       unit_principale: p.is_transformable ? p.unit : "",
       unit_secondaire: p.unit_secondaire || "",
       conversion_ratio: p.conversion_ratio != null ? String(p.conversion_ratio) : "",
       unit_price_secondaire: p.unit_price_secondaire != null ? String(p.unit_price_secondaire) : "",
+      purchase_price_secondaire: p.purchase_price_secondaire != null ? String(p.purchase_price_secondaire) : "",
     });
     setEditingQuantitySecondaire(p.quantity_secondaire);
     setFormError("");
@@ -100,17 +98,19 @@ export default function ArticlesPage() {
       setFormError("Le prix unitaire doit être un nombre positif");
       return;
     }
-    const quantity = parseFloat(form.quantity);
-    if (form.quantity === "" || Number.isNaN(quantity) || quantity < 0) {
-      setFormError("La quantité en stock doit être un nombre positif");
-      return;
+    let purchasePrice = 0;
+    if (form.purchase_price !== "") {
+      purchasePrice = parseFloat(form.purchase_price);
+      if (Number.isNaN(purchasePrice) || purchasePrice < 0) {
+        setFormError("Le prix d'achat doit être un nombre positif");
+        return;
+      }
     }
-
     const payload: Record<string, unknown> = {
       name: trimmedName,
       category_id: Number(form.category_id),
       unit_price: unitPrice,
-      quantity,
+      purchase_price: purchasePrice,
       is_transformable: form.is_transformable,
     };
 
@@ -139,10 +139,19 @@ export default function ArticlesPage() {
         setFormError(`Le prix unitaire de la forme secondaire (${unitSecondaire}) est requis`);
         return;
       }
+      let purchasePriceSecondaire = 0;
+      if (form.purchase_price_secondaire !== "") {
+        purchasePriceSecondaire = parseFloat(form.purchase_price_secondaire);
+        if (Number.isNaN(purchasePriceSecondaire) || purchasePriceSecondaire < 0) {
+          setFormError(`Le prix d'achat de la forme secondaire (${unitSecondaire}) doit être un nombre positif`);
+          return;
+        }
+      }
       payload.unit = unitPrincipale;
       payload.unit_secondaire = unitSecondaire;
       payload.conversion_ratio = ratio;
       payload.unit_price_secondaire = priceSecondaire;
+      payload.purchase_price_secondaire = purchasePriceSecondaire;
     }
 
     setSubmitting(true);
@@ -178,13 +187,13 @@ export default function ArticlesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-gray-900">Articles</h1>
         <div className="flex flex-wrap gap-2 sm:gap-3">
-          <button
-            onClick={openStats}
+          <Link
+            href="/dashboard/statistiques"
             className="flex items-center gap-2 border border-gray-300 rounded-md px-3 sm:px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             <IconChart className="w-4 h-4" />
             Statistiques
-          </button>
+          </Link>
           <button
             onClick={openCreate}
             className="bg-blue-600 text-white rounded-md px-3 sm:px-4 py-2 text-sm font-medium hover:bg-blue-700"
@@ -243,7 +252,10 @@ export default function ArticlesPage() {
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right space-x-3">
+                <td className="px-4 py-3 text-right space-x-3 whitespace-nowrap">
+                  <Link href={`/dashboard/approvisionnements/new?product_id=${p.id}`} className="text-green-600 hover:underline">
+                    Approvisionner
+                  </Link>
                   <button onClick={() => openEdit(p)} className="text-blue-600 hover:underline">
                     Modifier
                   </button>
@@ -314,7 +326,7 @@ export default function ArticlesPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Prix unitaire</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Prix de vente</label>
                 <input
                   type="number"
                   step="1"
@@ -325,19 +337,43 @@ export default function ArticlesPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Quantité en stock{form.is_transformable && form.unit_principale ? ` (${form.unit_principale})` : ""}
-                </label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Prix d&apos;achat</label>
                 <input
                   type="number"
-                  step="0.1"
+                  step="1"
                   min="0"
-                  value={form.quantity}
-                  onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+                  value={form.purchase_price}
+                  onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
                   className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="0"
                 />
+                <p className="text-[11px] text-gray-400 mt-1">Ce que vous payez au fournisseur (sert de coût par défaut à l&apos;approvisionnement)</p>
               </div>
             </div>
+
+            {editingProduct ? (
+              <div className="bg-gray-50 rounded-md px-3 py-2 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500">Stock actuel</p>
+                  <p className="text-sm font-medium">
+                    {editingProduct.quantity} {editingProduct.is_transformable ? editingProduct.unit : ""}
+                    {editingProduct.is_transformable && (
+                      <span className="text-gray-400"> / {editingProduct.quantity_secondaire} {editingProduct.unit_secondaire}</span>
+                    )}
+                  </p>
+                </div>
+                <Link
+                  href={`/dashboard/approvisionnements/new?product_id=${editingProduct.id}`}
+                  className="text-sm text-blue-600 hover:underline whitespace-nowrap"
+                >
+                  Approvisionner
+                </Link>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400">
+                L&apos;article démarre avec un stock à 0. Utilisez le module Approvisionnement pour le recevoir en stock.
+              </p>
+            )}
 
             <div className="border-t pt-3">
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -398,18 +434,34 @@ export default function ArticlesPage() {
                       placeholder="Ex: 4"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Prix unitaire ({form.unit_secondaire || "forme secondaire"})
-                    </label>
-                    <input
-                      type="number"
-                      step="1"
-                      min="0"
-                      value={form.unit_price_secondaire}
-                      onChange={(e) => setForm({ ...form, unit_price_secondaire: e.target.value })}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Prix de vente ({form.unit_secondaire || "forme secondaire"})
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={form.unit_price_secondaire}
+                        onChange={(e) => setForm({ ...form, unit_price_secondaire: e.target.value })}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Prix d&apos;achat ({form.unit_secondaire || "forme secondaire"})
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={form.purchase_price_secondaire}
+                        onChange={(e) => setForm({ ...form, purchase_price_secondaire: e.target.value })}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2"
+                        placeholder="0"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -436,40 +488,6 @@ export default function ArticlesPage() {
           </form>
         </Modal>
       )}
-
-      {showStats && (
-        <Modal title="Statistiques des articles" onClose={() => setShowStats(false)}>
-          {statsLoading && <p className="text-gray-400 text-sm">Chargement...</p>}
-          {statsError && <p className="text-sm text-red-600">{statsError}</p>}
-          {stats && (
-            <div className="grid grid-cols-2 gap-4">
-              <StatBox label="Articles" value={stats.total_products} />
-              <StatBox
-                label="En rupture de stock"
-                value={stats.out_of_stock_count}
-                highlight={stats.out_of_stock_count > 0}
-              />
-              <StatBox label="Quantité totale en stock" value={stats.total_stock_quantity} />
-              <StatBox label="Prix moyen" value={`${stats.average_price.toLocaleString(undefined, { maximumFractionDigits: 0 })} FCFA`} />
-              <div className="col-span-2">
-                <StatBox
-                  label="Valeur totale du stock"
-                  value={`${stats.total_stock_value.toLocaleString(undefined, { maximumFractionDigits: 0 })} FCFA`}
-                />
-              </div>
-            </div>
-          )}
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-function StatBox({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
-  return (
-    <div className={`rounded-md px-4 py-3 ${highlight ? "bg-red-50" : "bg-gray-50"}`}>
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className={`text-xl font-bold mt-1 ${highlight ? "text-red-600" : "text-gray-900"}`}>{value}</p>
     </div>
   );
 }

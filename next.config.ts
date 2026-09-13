@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import withSerwistInit from "@serwist/next";
 
 const nextConfig: NextConfig = {
   compiler: {
@@ -13,4 +14,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+const withSerwist = withSerwistInit({
+  swSrc: "app/sw.ts",
+  swDest: "public/sw.js",
+  // Le SW n'a de sens qu'en prod : en dev il servirait des assets périmés
+  // depuis le cache et gênerait le hot-reload.
+  disable: process.env.NODE_ENV === "development",
+  reloadOnOnline: true,
+});
+
+export default withSerwist(nextConfig);

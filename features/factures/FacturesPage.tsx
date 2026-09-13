@@ -40,12 +40,12 @@ export default function FacturesPage() {
     fetchAllClients()
       .then((clients) => setClientNamesById(new Map(clients.map((c) => [c.id, c.name]))))
       .catch(() => {
-        // La colonne Client retombe alors sur "—" ; le reste de la page reste fonctionnel.
+        // La colonne Client retombe alors sur "Client Divers" ; le reste de la page reste fonctionnel.
       });
   }, []);
 
   const clientLabel = useMemo(
-    () => (inv: Invoice) => inv.client_name || (inv.client_id != null ? clientNamesById.get(inv.client_id) : undefined) || "—",
+    () => (inv: Invoice) => inv.client_name || (inv.client_id != null ? clientNamesById.get(inv.client_id) : undefined) || "Client Divers",
     [clientNamesById]
   );
 

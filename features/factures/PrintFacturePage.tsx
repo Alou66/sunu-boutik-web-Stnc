@@ -61,7 +61,7 @@ export default function PrintFacturePage() {
   const dateObj = new Date(invoice.created_at);
   const dateStr = dateObj.toLocaleDateString("fr-FR");
   const heureStr = dateObj.toLocaleTimeString("fr-FR");
-  const clientLabel = client?.name || invoice.client_name || "";
+  const clientLabel = client?.name || invoice.client_name || "Client Divers";
   const clientPhone = client?.phone || "";
   const clientAddress = client?.address || "";
   const totalQty = invoice.lines.reduce((s, l) => s + l.quantity, 0);

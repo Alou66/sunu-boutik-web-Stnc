@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -127,6 +127,8 @@ export const adminApi = {
   get: <T>(path: string) => request<T>(path, {}, getAdminToken),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }, getAdminToken),
+  patch: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: "PATCH", body: body ? JSON.stringify(body) : undefined }, getAdminToken),
 };
 
 export interface PaginatedList<T> {

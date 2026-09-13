@@ -9,7 +9,13 @@ const PAGE_SIZE = 8;
 
 export default function AdminClientsPage() {
   const [page, setPage] = useState(1);
-  const { shops, total, totalPages, loading, error } = useAdminShops(page, PAGE_SIZE, "approved");
+  const [search, setSearch] = useState("");
+  const { shops, total, totalPages, loading, error } = useAdminShops(page, PAGE_SIZE, "approved", search || undefined);
+
+  function changeSearch(value: string) {
+    setSearch(value);
+    setPage(1);
+  }
 
   const [selectedShop, setSelectedShop] = useState<ShopAdmin | null>(null);
   const { stats, loading: statsLoading, load: loadStats } = useShopStats();
@@ -21,8 +27,18 @@ export default function AdminClientsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-bold text-gray-900">Mes Clients</h1>
-      <p className="text-sm text-gray-500">Boutiques validées et actives sur la plateforme.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Mes Clients</h1>
+          <p className="text-sm text-gray-500">Boutiques validées et actives sur la plateforme.</p>
+        </div>
+        <input
+          value={search}
+          onChange={(e) => changeSearch(e.target.value)}
+          placeholder="Rechercher une boutique ou un propriétaire..."
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm w-64"
+        />
+      </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
