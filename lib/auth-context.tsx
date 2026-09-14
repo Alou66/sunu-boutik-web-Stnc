@@ -2,7 +2,9 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { api, clearToken, getToken, setToken, Shop, User } from "./api";
+import { api, clearToken, getToken, setToken, Shop, User, SESSION_EXPIRED_EVENT } from "./api";
+
+export const SESSION_MESSAGE_KEY = "sunu-session-message";
 
 interface AuthContextValue {
   user: User | null;
@@ -50,6 +52,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    // Un compte désactivé pendant qu'une session est ouverte doit être coupé
+    // à la prochaine requête (voir lib/api.ts) : on vide la session locale et
+    // on redirige immédiatement, sans laisser l'utilisateur sur une page avec
+    // des données déjà chargées.
+    function onSessionExpired(e: Event) {
+      const message = (e as CustomEvent<string>).detail || "Votre session a expiré, veuillez vous reconnecter.";
+      try {
+        window.sessionStorage.setItem(SESSION_MESSAGE_KEY, message);
+      } catch {
+        // ignore (stockage indisponible)
+      }
+      clearToken();
+      setUser(null);
+      setShop(null);
+      router.replace("/login");
+    }
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+  }, [router]);
 
   async function login(email: string, password: string) {
     const res = await api.post<{ access_token: string }>("/auth/login", { email, password });

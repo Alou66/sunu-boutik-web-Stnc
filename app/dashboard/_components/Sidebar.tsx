@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { ROLE_OWNER } from "@/lib/api";
 import { LogoMark } from "@/components/Logo";
 import {
+  IconBadge,
   IconBox,
   IconCash,
   IconChart,
@@ -23,6 +25,14 @@ import {
   IconX,
 } from "@/components/Icons";
 
+// Statistiques et Employés sont réservés au propriétaire (owner) de la
+// boutique : un employee n'a pas accès aux infos globales de la boutique ni
+// au pilotage de l'équipe (voir aussi app/dashboard/layout.tsx pour le
+// blocage des URLs directes, et le backend qui refuse ces routes
+// indépendamment du menu).
+// Profil reste accessible à tous : chaque utilisateur (owner ou employee) y
+// gère ses propres informations personnelles ; seul l'owner y voit en plus
+// la section "Informations de la boutique" (voir ProfilPage).
 export const navItems = [
   { href: "/dashboard/categories", label: "Catégories", Icon: IconTag },
   { href: "/dashboard/articles", label: "Articles", Icon: IconBox },
@@ -32,8 +42,9 @@ export const navItems = [
   { href: "/dashboard/clients", label: "Clients", Icon: IconUsers },
   { href: "/dashboard/factures", label: "Factures", Icon: IconReceipt },
   { href: "/dashboard/caisse", label: "Caisse", Icon: IconCash },
-  { href: "/dashboard/statistiques", label: "Statistiques", Icon: IconChart },
+  { href: "/dashboard/statistiques", label: "Statistiques", Icon: IconChart, ownerOnly: true },
   { href: "/dashboard/bons-clients", label: "Bons clients", Icon: IconNote },
+  { href: "/dashboard/employes", label: "Employés", Icon: IconBadge, ownerOnly: true },
   { href: "/dashboard/profil", label: "Profil", Icon: IconUser },
 ];
 
@@ -48,8 +59,10 @@ export default function Sidebar({
   onCloseMobile: () => void;
   onToggleCollapsed: () => void;
 }) {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const pathname = usePathname();
+  const isOwner = user?.role === ROLE_OWNER;
+  const visibleItems = navItems.filter((item) => !item.ownerOnly || isOwner);
 
   return (
     <>
@@ -103,7 +116,7 @@ export default function Sidebar({
         )}
 
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto py-4">
-          {navItems.map((item) => {
+          {visibleItems.map((item) => {
             const active = pathname.startsWith(item.href);
             return (
               <Link

@@ -4,11 +4,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { ROLE_OWNER } from "@/lib/api";
 import { IconPlus } from "@/components/Icons";
-import Sidebar from "./_components/Sidebar";
+import Sidebar, { navItems } from "./_components/Sidebar";
 import Header from "./_components/Header";
 
 const SIDEBAR_COLLAPSED_KEY = "sunu-sidebar-collapsed";
+
+// Chemins réservés au propriétaire (owner) : dérivés du menu pour n'avoir
+// qu'une seule source de vérité. Un employee qui tape directement l'URL doit
+// être redirigé — le masquage du menu seul ne suffit pas (voir aussi le
+// backend, qui refuse ces routes indépendamment de ce garde-fou UI).
+const OWNER_ONLY_PATHS = navItems.filter((item) => item.ownerOnly).map((item) => item.href);
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -39,10 +46,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
     if (user.must_change_password) {
       router.replace("/change-password");
+      return;
     }
-  }, [loading, user, router]);
+    if (user.role !== ROLE_OWNER && OWNER_ONLY_PATHS.some((path) => pathname.startsWith(path))) {
+      router.replace("/dashboard/articles");
+    }
+  }, [loading, user, router, pathname]);
 
-  if (loading || !user || user.must_change_password) {
+  const forbiddenForRole =
+    !!user &&
+    user.role !== ROLE_OWNER &&
+    OWNER_ONLY_PATHS.some((path) => pathname.startsWith(path));
+
+  if (loading || !user || user.must_change_password || forbiddenForRole) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <p className="text-gray-500">Chargement...</p>

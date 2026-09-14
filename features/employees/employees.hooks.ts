@@ -1,17 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
-import { fetchInvoices } from "./factures.api";
-import { Invoice } from "./factures.types";
+import { Employee } from "./employees.types";
+import { fetchEmployees } from "./employees.api";
 
-export function useInvoices(
-  page: number,
-  pageSize: number,
-  search: string,
-  date: string,
-  statusFilter: string,
-  employeeId: string = ""
-) {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+export function useEmployees(page: number, search: string) {
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -21,8 +14,8 @@ export function useInvoices(
     setLoading(true);
     setError("");
     try {
-      const list = await fetchInvoices(page, pageSize, search, date, statusFilter, employeeId);
-      setInvoices(list.items);
+      const list = await fetchEmployees(page, search);
+      setEmployees(list.items);
       setTotal(list.total);
       setTotalPages(list.total_pages);
     } catch (err) {
@@ -30,11 +23,11 @@ export function useInvoices(
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, search, date, statusFilter, employeeId]);
+  }, [page, search]);
 
   useEffect(() => {
     reload();
   }, [reload]);
 
-  return { invoices, total, totalPages, loading, error, reload };
+  return { employees, total, totalPages, loading, error, setError, reload };
 }

@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 import withSerwistInit from "@serwist/next";
 
 const nextConfig: NextConfig = {
+  // Génère .next/standalone : un bundle Node minimal (sans node_modules complet),
+  // indispensable pour une image Docker de prod légère.
+  output: "standalone",
   compiler: {
     removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error"] } : false,
   },

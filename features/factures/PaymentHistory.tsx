@@ -33,6 +33,7 @@ export default function PaymentHistory({
   }, [invoiceId, refreshKey]);
 
   function payerName(payment: Payment): string {
+    if (payment.created_by_name) return payment.created_by_name;
     if (currentUser && payment.created_by_id === currentUser.id) return currentUser.full_name;
     return "—";
   }

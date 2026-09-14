@@ -64,6 +64,16 @@ export function IconUser({ className = "w-[18px] h-[18px]" }: { className?: stri
   );
 }
 
+export function IconBadge({ className = "w-[18px] h-[18px]" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <rect x="4" y="4" width="16" height="16" rx="2.5" />
+      <circle cx="12" cy="10" r="2.4" />
+      <path d="M8 17c0-2 1.8-3.2 4-3.2s4 1.2 4 3.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function IconCash({ className = "w-[18px] h-[18px]" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
@@ -169,6 +179,25 @@ export function IconLogout({ className = "w-[18px] h-[18px]" }: { className?: st
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <path d="M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4" />
       <path d="M16 17l5-5-5-5M21 12H9" />
+    </svg>
+  );
+}
+
+export function IconEye({ className = "w-[18px] h-[18px]" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+export function IconEyeOff({ className = "w-[18px] h-[18px]" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M9.9 4.24A10.4 10.4 0 0 1 12 4c7 0 10.5 8 10.5 8a13.5 13.5 0 0 1-4.13 5.06M6.5 6.63C3.6 8.42 1.5 12 1.5 12s3.5 8 10.5 8a10.4 10.4 0 0 0 5.08-1.33" />
+      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+      <path d="M3 3l18 18" />
     </svg>
   );
 }

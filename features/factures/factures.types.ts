@@ -10,7 +10,7 @@ export interface InvoiceLine {
   form?: ProductForm | null;
 }
 
-export type InvoiceStatus = "unpaid" | "partial" | "paid";
+export type InvoiceStatus = "unpaid" | "partial" | "paid" | "cancelled";
 
 export interface Invoice {
   id: number;
@@ -22,7 +22,13 @@ export interface Invoice {
   balance_due: number;
   status: InvoiceStatus;
   note?: string | null;
+  created_by_id?: number | null;
+  created_by_name?: string | null;
   created_at: string;
+  cancelled_at?: string | null;
+  cancelled_by_id?: number | null;
+  cancelled_by_name?: string | null;
+  cancel_reason?: string | null;
   lines: InvoiceLine[];
 }
 
@@ -42,6 +48,7 @@ export interface Payment {
   change?: number | null;
   note?: string | null;
   created_by_id?: number | null;
+  created_by_name?: string | null;
   created_at: string;
   voided_at?: string | null;
   void_reason?: string | null;

@@ -9,7 +9,7 @@ import InvoiceCopiesView from "./InvoiceCopiesView";
 import InvoiceStatusBadge from "./InvoiceStatusBadge";
 import PaymentHistory from "./PaymentHistory";
 import PaymentModal from "./PaymentModal";
-import { fetchInvoice, fetchPdfBlob } from "./factures.api";
+import { cancelInvoice, deleteInvoice, fetchInvoice, fetchPdfBlob } from "./factures.api";
 import { Invoice, PdfFormat } from "./factures.types";
 
 type ViewFormat = PdfFormat | "copies";
@@ -27,6 +27,9 @@ export default function FactureDetailPage() {
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [actionError, setActionError] = useState("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   function loadInvoice() {
@@ -85,6 +88,38 @@ export default function FactureDetailPage() {
     }
   }
 
+  async function handleCancel() {
+    const reason = prompt("Annuler cette facture — motif de l'annulation (le stock sera recrédité) :");
+    if (reason === null) return;
+    if (!reason.trim()) {
+      setActionError("Le motif d'annulation est requis");
+      return;
+    }
+    setActionError("");
+    setCancelling(true);
+    try {
+      await cancelInvoice(invoiceId, reason.trim());
+      loadInvoice();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Erreur lors de l'annulation");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm("Supprimer définitivement cette facture annulée ? Cette action est irréversible.")) return;
+    setActionError("");
+    setDeleting(true);
+    try {
+      await deleteInvoice(invoiceId);
+      router.push("/dashboard/factures");
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Erreur lors de la suppression");
+      setDeleting(false);
+    }
+  }
+
   if (error) return <p className="text-sm text-red-600">{error}</p>;
   if (!invoice || !shop) return <p className="text-gray-400">Chargement...</p>;
 
@@ -122,12 +157,32 @@ export default function FactureDetailPage() {
               2 exemplaires
             </button>
           </div>
-          <button
-            onClick={() => router.push(`/dashboard/factures/${invoiceId}/edit`)}
-            className="border border-gray-300 rounded-md px-3 sm:px-4 py-2 text-sm font-medium hover:bg-gray-50"
-          >
-            Modifier
-          </button>
+          {invoice.status !== "cancelled" && (
+            <button
+              onClick={() => router.push(`/dashboard/factures/${invoiceId}/edit`)}
+              className="border border-gray-300 rounded-md px-3 sm:px-4 py-2 text-sm font-medium hover:bg-gray-50"
+            >
+              Modifier
+            </button>
+          )}
+          {invoice.status !== "cancelled" && (
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="border border-red-300 text-red-600 rounded-md px-3 sm:px-4 py-2 text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+            >
+              {cancelling ? "Annulation..." : "Annuler la facture"}
+            </button>
+          )}
+          {invoice.status === "cancelled" && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-600 text-white rounded-md px-3 sm:px-4 py-2 text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+            >
+              {deleting ? "Suppression..." : "Supprimer définitivement"}
+            </button>
+          )}
           <button
             onClick={handlePrint}
             disabled={printDisabled}
@@ -147,6 +202,16 @@ export default function FactureDetailPage() {
         </div>
       </div>
 
+      {actionError && <p className="no-print text-sm text-red-600">{actionError}</p>}
+
+      {invoice.status === "cancelled" && (
+        <div className="no-print bg-gray-100 border border-gray-300 rounded-xl px-4 sm:px-5 py-3 text-sm text-gray-700">
+          Facture annulée{invoice.cancelled_by_name ? ` par ${invoice.cancelled_by_name}` : ""}
+          {invoice.cancelled_at ? ` le ${new Date(invoice.cancelled_at).toLocaleString("fr-FR")}` : ""}
+          {invoice.cancel_reason ? ` — motif : ${invoice.cancel_reason}` : ""}
+        </div>
+      )}
+
       <div className="no-print bg-white rounded-xl shadow px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-sm">
           <InvoiceStatusBadge status={invoice.status} />
@@ -159,7 +224,7 @@ export default function FactureDetailPage() {
             <span className="font-semibold text-blue-700">{invoice.balance_due.toLocaleString()} FCFA</span>
           </div>
         </div>
-        {invoice.status !== "paid" && (
+        {invoice.status !== "paid" && invoice.status !== "cancelled" && (
           <button
             onClick={() => setShowPaymentModal(true)}
             className="bg-green-600 text-white rounded-md px-3 sm:px-4 py-2 text-sm font-medium hover:bg-green-700"

@@ -8,12 +8,14 @@ export function fetchInvoices(
   pageSize: number,
   search: string,
   date: string,
-  statusFilter: string
+  statusFilter: string,
+  employeeId: string = ""
 ) {
   const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
   if (search) params.set("search", search);
   if (date) params.set("date", date);
   if (statusFilter) params.set("status_filter", statusFilter);
+  if (employeeId) params.set("employee_id", employeeId);
   return api.get<InvoiceList>(`/invoices?${params.toString()}`);
 }
 
@@ -27,6 +29,14 @@ export function createInvoice(payload: unknown) {
 
 export function updateInvoice(id: number, payload: unknown) {
   return api.patch<Invoice>(`/invoices/${id}`, payload);
+}
+
+export function cancelInvoice(id: number, reason: string) {
+  return api.post<Invoice>(`/invoices/${id}/cancel`, { reason });
+}
+
+export function deleteInvoice(id: number) {
+  return api.delete<void>(`/invoices/${id}`);
 }
 
 export function pdfUrl(invoiceId: number, format: PdfFormat = "ticket"): string {

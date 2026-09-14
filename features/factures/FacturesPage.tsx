@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import SkeletonRows from "@/components/SkeletonRows";
 import { fetchAllClients } from "@/features/clients/clients.api";
+import { fetchEmployeesLookup } from "@/features/employees/employees.api";
+import { UserLookup } from "@/features/employees/employees.types";
+import { ApiError } from "@/lib/api";
 import InvoiceStatusBadge, { STATUS_LABELS } from "./InvoiceStatusBadge";
 import { Invoice } from "./factures.types";
-import { fetchInvoicesExportBlob } from "./factures.api";
+import { deleteInvoice, fetchInvoicesExportBlob } from "./factures.api";
 import { useInvoices } from "./factures.hooks";
 
 const PAGE_SIZE = 20;
@@ -29,18 +32,34 @@ export default function FacturesPage() {
   const [search, setSearch] = useState("");
   const [date, setDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const { invoices, total, totalPages, loading, error } = useInvoices(page, PAGE_SIZE, search, date, statusFilter);
+  const [employeeFilter, setEmployeeFilter] = useState("");
+  const { invoices, total, totalPages, loading, error, reload } = useInvoices(
+    page,
+    PAGE_SIZE,
+    search,
+    date,
+    statusFilter,
+    employeeFilter
+  );
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const [exportFrom, setExportFrom] = useState(defaultDateFrom);
   const [exportTo, setExportTo] = useState(defaultDateTo);
   const [exporting, setExporting] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [clientNamesById, setClientNamesById] = useState<Map<number, string>>(new Map());
+  const [employees, setEmployees] = useState<UserLookup[]>([]);
 
   useEffect(() => {
     fetchAllClients()
       .then((clients) => setClientNamesById(new Map(clients.map((c) => [c.id, c.name]))))
       .catch(() => {
         // La colonne Client retombe alors sur "Client Divers" ; le reste de la page reste fonctionnel.
+      });
+    fetchEmployeesLookup()
+      .then(setEmployees)
+      .catch(() => {
+        // Le filtre "par employé" reste alors simplement vide.
       });
   }, []);
 
@@ -62,6 +81,25 @@ export default function FacturesPage() {
   function onStatusFilterChange(value: string) {
     setStatusFilter(value);
     setPage(1);
+  }
+
+  function onEmployeeFilterChange(value: string) {
+    setEmployeeFilter(value);
+    setPage(1);
+  }
+
+  async function handleDelete(inv: Invoice) {
+    if (!confirm(`Supprimer définitivement la facture ${inv.number} ? Cette action est irréversible.`)) return;
+    setDeleteError("");
+    setDeletingId(inv.id);
+    try {
+      await deleteInvoice(inv.id);
+      reload();
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : "Erreur lors de la suppression");
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   async function handleExport() {
@@ -108,6 +146,16 @@ export default function FacturesPage() {
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
+          <select
+            value={employeeFilter}
+            onChange={(e) => onEmployeeFilterChange(e.target.value)}
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Tous les employés</option>
+            {employees.map((emp) => (
+              <option key={emp.id} value={emp.id}>{emp.full_name}</option>
+            ))}
+          </select>
           <button
             onClick={() => setShowExportModal(true)}
             className="flex items-center gap-1.5 border border-green-600 text-green-700 rounded-md px-3 py-2 text-sm font-medium hover:bg-green-50"
@@ -135,6 +183,7 @@ export default function FacturesPage() {
       />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+      {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
 
       <div className="bg-white rounded-xl shadow overflow-x-auto">
         <table className="w-full min-w-[480px] text-sm">
@@ -143,16 +192,17 @@ export default function FacturesPage() {
               <th className="px-4 py-3">Numéro</th>
               <th className="px-4 py-3">Client</th>
               <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3">Créé par</th>
               <th className="px-4 py-3">Statut</th>
               <th className="px-4 py-3 text-right">Total</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {loading && <SkeletonRows cols={6} />}
+            {loading && <SkeletonRows cols={7} />}
             {!loading && invoices.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-gray-400">Aucune facture</td>
+                <td colSpan={7} className="px-4 py-6 text-center text-gray-400">Aucune facture</td>
               </tr>
             )}
             {invoices.map((inv) => (
@@ -166,17 +216,28 @@ export default function FacturesPage() {
                 <td className="px-4 py-3 text-gray-500">
                   {new Date(inv.created_at).toLocaleString("fr-FR")}
                 </td>
+                <td className="px-4 py-3 text-gray-700">{inv.created_by_name || "—"}</td>
                 <td className="px-4 py-3">
                   <InvoiceStatusBadge status={inv.status} />
                 </td>
                 <td className="px-4 py-3 text-right">{inv.total.toLocaleString()} FCFA</td>
                 <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => router.push(`/dashboard/factures/${inv.id}/edit`)}
-                    className="text-blue-600 hover:underline"
-                  >
-                    Modifier
-                  </button>
+                  {inv.status === "cancelled" ? (
+                    <button
+                      onClick={() => handleDelete(inv)}
+                      disabled={deletingId === inv.id}
+                      className="text-red-600 hover:underline disabled:opacity-50"
+                    >
+                      {deletingId === inv.id ? "Suppression..." : "Supprimer"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => router.push(`/dashboard/factures/${inv.id}/edit`)}
+                      className="text-blue-600 hover:underline"
+                    >
+                      Modifier
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

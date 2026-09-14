@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
+import PasswordInput from "@/components/PasswordInput";
 import { ApiError } from "@/lib/api";
 import { checkPhoneForReset, resetPasswordByPhone } from "./auth.api";
 
@@ -108,26 +109,24 @@ export default function ForgotPasswordPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Nouveau mot de passe
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   required
+                  autoComplete="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Minimum 6 caractères"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Confirmer le mot de passe
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   required
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Répétez le mot de passe"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               {error && <p className="text-sm text-red-600">{error}</p>}

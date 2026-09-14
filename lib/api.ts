@@ -34,6 +34,19 @@ export class ApiError extends Error {
   }
 }
 
+// Émis quand une requête authentifiée (côté boutique) est refusée avec 401 :
+// le compte a été désactivé (ou son token invalidé) depuis l'émission du
+// token. lib/auth-context.tsx écoute cet événement pour nettoyer la session
+// et rediriger vers /login, plutôt que de laisser l'utilisateur naviguer
+// avec des données déjà chargées sur un compte qui n'a plus accès.
+export const SESSION_EXPIRED_EVENT = "sunu:session-expired";
+
+function notifySessionExpired(message: string) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail: message }));
+  }
+}
+
 // Cache mémoire court-terme pour les GET : rend les navigations répétées instantanées
 // sans servir de données obsolètes après une création/modification/suppression.
 const GET_CACHE_TTL_MS = 15_000;
@@ -87,6 +100,13 @@ async function request<T>(
         detail = data.detail || detail;
       } catch {
         // ignore
+      }
+      // 401 sur une requête déjà authentifiée (côté boutique) = session morte
+      // (compte désactivé, ou réactivé après une désactivation) : on ne traite
+      // pas /auth/login (pas encore de token) ni le back-office plateforme
+      // (tokenGetter === getAdminToken) de la même façon.
+      if (res.status === 401 && token && tokenGetter === getToken) {
+        notifySessionExpired(detail);
       }
       throw new ApiError(detail, res.status);
     }
@@ -181,8 +201,12 @@ export interface User {
   id: number;
   full_name: string;
   email: string;
+  phone?: string | null;
   role: string;
   shop_id: number;
   must_change_password: boolean;
 }
+
+export const ROLE_OWNER = "owner";
+export const ROLE_EMPLOYEE = "employee";
 

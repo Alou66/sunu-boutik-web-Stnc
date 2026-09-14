@@ -4,12 +4,14 @@ export const STATUS_LABELS: Record<InvoiceStatus, string> = {
   unpaid: "Non payée",
   partial: "Partiellement payée",
   paid: "Payée",
+  cancelled: "Annulée",
 };
 
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
   unpaid: "bg-red-100 text-red-700",
   partial: "bg-amber-100 text-amber-800",
   paid: "bg-green-100 text-green-800",
+  cancelled: "bg-gray-200 text-gray-600",
 };
 
 export default function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
