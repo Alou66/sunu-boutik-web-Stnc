@@ -15,6 +15,7 @@ export function executeTransformation(payload: {
   direction: TransformationDirection;
   quantity: number;
   note: string | null;
+  idempotency_key: string;
 }) {
   return api.post<TransformationResult>("/transformations/execute", payload);
 }

@@ -16,6 +16,10 @@ export default function TransformationsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  // Régénérée après chaque transformation réussie (voir resetForm) : tant
+  // qu'elle reste la même, une resoumission (double clic, retry réseau) est
+  // reconnue par le backend et ne déplace pas le stock une seconde fois.
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
 
   const { products, reload: reloadProducts } = useTransformableProducts();
 
@@ -47,6 +51,10 @@ export default function TransformationsPage() {
     setQuantity("");
     setNote("");
     setFormError("");
+    // Nouvelle tentative logiquement distincte : une clé fraîche évite que le
+    // backend confonde la prochaine transformation avec un simple rejeu de
+    // celle qui vient de réussir.
+    setIdempotencyKey(crypto.randomUUID());
   }
 
   async function onSubmit(e: FormEvent) {
@@ -74,6 +82,7 @@ export default function TransformationsPage() {
         direction,
         quantity: parsedQuantity,
         note: note.trim() || null,
+        idempotency_key: idempotencyKey,
       });
       setSuccessMessage(
         `${result.log.quantity_from} ${result.log.unit_from} transformé(s) en ${result.log.quantity_to} ${result.log.unit_to}.`

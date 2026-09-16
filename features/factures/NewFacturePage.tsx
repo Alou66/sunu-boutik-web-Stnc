@@ -49,6 +49,11 @@ export default function NewFacturePage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  // Générée une seule fois pour la durée de vie de cette page et réutilisée à
+  // chaque tentative : si la requête est renvoyée (double clic, retry
+  // réseau), le backend reconnaît la clé et renvoie la facture déjà créée au
+  // lieu d'en créer une seconde (même mécanisme que PaymentModal).
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
   const articleRef = useRef<SearchSelectHandle>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
   const priceRef = useRef<HTMLInputElement>(null);
@@ -194,6 +199,7 @@ export default function NewFacturePage() {
         client_name: clientId ? null : clientName.trim() || null,
         note: null,
         lines: validLines,
+        idempotency_key: idempotencyKey,
       });
       localStorage.removeItem(DRAFT_KEY);
       router.push(`/dashboard/factures/${result.id}`);

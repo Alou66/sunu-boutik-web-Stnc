@@ -7,16 +7,21 @@ import { useAuth } from "@/lib/auth-context";
 import Logo from "@/components/Logo";
 import Modal from "@/components/Modal";
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
 export default function Home() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [showAppModal, setShowAppModal] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
     const handler = (e: Event) => {
       e.preventDefault();
-      setInstallPrompt(e);
+      setInstallPrompt(e as BeforeInstallPromptEvent);
     };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
@@ -75,8 +80,8 @@ export default function Home() {
               onClick={async () => {
                 if (installPrompt) {
                   // Desktop : déclencher l'installation PWA
-                  (installPrompt as any).prompt();
-                  const { outcome } = await (installPrompt as any).userChoice;
+                  installPrompt.prompt();
+                  const { outcome } = await installPrompt.userChoice;
                   if (outcome === "accepted") setInstallPrompt(null);
                 } else {
                   // Mobile ou PWA non disponible : afficher le modal
