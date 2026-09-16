@@ -46,7 +46,7 @@ export default function LoginPage() {
         <div className="flex justify-center mb-1">
           <Logo markClassName="w-9 h-9" className="text-2xl" />
         </div>
-        <p className="text-center text-gray-500 mb-6">Connexion à votre boutique</p>
+        <p className="text-center text-gray-500 mb-6">Connexion à votre boutique ALDIMIA</p>
 
         {sessionMessage && (
           <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">{sessionMessage}</p>
