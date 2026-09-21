@@ -3,19 +3,23 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Logo from "@/components/Logo";
 import PasswordInput from "@/components/PasswordInput";
 import { ApiError } from "@/lib/api";
-import { confirmPasswordReset, requestPasswordReset } from "./auth.api";
+// Même mécanisme que la boutique (owner/employee) : /auth/forgot-password/* est
+// un flux par e-mail commun à tous les rôles, y compris ADMIN (voir
+// IdentityService.request_password_reset / confirm_password_reset côté API).
+// On réutilise donc directement ces appels plutôt que d'en dupliquer une
+// deuxième version pour l'admin ; seule la présentation ci-dessous est propre
+// au thème sombre de l'espace administration.
+import { confirmPasswordReset, requestPasswordReset } from "@/features/auth/auth.api";
+import { ADMIN_SESSION_MESSAGE_KEY } from "./admin.constants";
 
 type Step = "email" | "reset" | "done";
 
 const CODE_LENGTH = 6;
-// Aligné sur le délai minimal entre deux e-mails de code côté API : un renvoi
-// plus rapide serait ignoré par le serveur.
 const RESEND_DELAY_SECONDS = 60;
 
-export default function ForgotPasswordPage() {
+export default function AdminForgotPasswordPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
@@ -93,18 +97,28 @@ export default function ForgotPasswordPage() {
     }
   }
 
+  function onGoToLogin() {
+    try {
+      window.sessionStorage.setItem(
+        ADMIN_SESSION_MESSAGE_KEY,
+        "Votre mot de passe a été réinitialisé. Connectez-vous avec votre nouveau mot de passe."
+      );
+    } catch {
+      // ignore (stockage indisponible)
+    }
+    router.push("/admin/login");
+  }
+
   return (
     <div className="flex flex-1 items-center justify-center px-4">
       <div className="w-full max-w-sm bg-white rounded-xl shadow p-8">
-        <div className="flex justify-center mb-1">
-          <Logo markClassName="w-9 h-9" className="text-2xl" />
-        </div>
-        <h1 className="text-center font-semibold text-lg mb-1">Mot de passe oublié</h1>
+        <h1 className="text-2xl font-bold text-center text-gray-900 mb-1">Administration</h1>
+        <p className="text-center text-gray-500 mb-6">Mot de passe oublié</p>
 
         {step === "email" && (
           <>
             <p className="text-center text-gray-500 text-sm mb-6">
-              Entrez l&apos;adresse e-mail de votre compte, nous vous enverrons un code de vérification
+              Entrez l&apos;adresse e-mail de votre compte administrateur, nous vous enverrons un code de vérification
             </p>
             <form onSubmit={onRequestCode} className="space-y-4">
               <div>
@@ -115,15 +129,15 @@ export default function ForgotPasswordPage() {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="vous@exemple.com"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="admin@exemple.com"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-800"
                 />
               </div>
               {error && <p className="text-sm text-red-600">{error}</p>}
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-blue-600 text-white rounded-md py-2 font-medium hover:bg-blue-700 disabled:opacity-50"
+                className="w-full bg-gray-900 text-white rounded-md py-2 font-medium hover:bg-gray-800 disabled:opacity-50"
               >
                 {submitting ? "Envoi..." : "Envoyer le code"}
               </button>
@@ -151,11 +165,9 @@ export default function ForgotPasswordPage() {
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   value={code}
-                  // Filtre les non-chiffres puis coupe à 6 : un code collé avec espaces
-                  // ou préfixe ("123 456") est nettoyé (un maxLength tronquerait AVANT ce filtre).
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH))}
                   placeholder="123456"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-center font-mono text-lg tracking-[0.3em] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-center font-mono text-lg tracking-[0.3em] focus:outline-none focus:ring-2 focus:ring-gray-800"
                 />
               </div>
               <div>
@@ -168,6 +180,7 @@ export default function ForgotPasswordPage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Minimum 6 caractères"
+                  ringClassName="focus:ring-gray-800"
                 />
               </div>
               <div>
@@ -180,6 +193,7 @@ export default function ForgotPasswordPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Répétez le mot de passe"
+                  ringClassName="focus:ring-gray-800"
                 />
               </div>
               {info && <p className="text-sm text-green-700">{info}</p>}
@@ -187,7 +201,7 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-blue-600 text-white rounded-md py-2 font-medium hover:bg-blue-700 disabled:opacity-50"
+                className="w-full bg-gray-900 text-white rounded-md py-2 font-medium hover:bg-gray-800 disabled:opacity-50"
               >
                 {submitting ? "Enregistrement..." : "Réinitialiser le mot de passe"}
               </button>
@@ -195,7 +209,7 @@ export default function ForgotPasswordPage() {
                 type="button"
                 onClick={onResend}
                 disabled={submitting || resendIn > 0}
-                className="w-full text-sm text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline"
+                className="w-full text-sm text-gray-700 hover:underline disabled:text-gray-400 disabled:no-underline"
               >
                 {resendIn > 0 ? `Renvoyer un code (${resendIn} s)` : "Renvoyer un code"}
               </button>
@@ -222,8 +236,8 @@ export default function ForgotPasswordPage() {
             <p className="font-semibold text-gray-800">Mot de passe réinitialisé !</p>
             <p className="text-sm text-gray-500">Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.</p>
             <button
-              onClick={() => router.push("/login")}
-              className="w-full bg-blue-600 text-white rounded-md py-2 font-medium hover:bg-blue-700"
+              onClick={onGoToLogin}
+              className="w-full bg-gray-900 text-white rounded-md py-2 font-medium hover:bg-gray-800"
             >
               Se connecter
             </button>
@@ -232,7 +246,7 @@ export default function ForgotPasswordPage() {
 
         {step !== "done" && (
           <p className="text-sm text-center text-gray-500 mt-6">
-            <Link href="/login" className="text-blue-600 hover:underline">
+            <Link href="/admin/login" className="text-gray-700 hover:underline">
               ← Retour à la connexion
             </Link>
           </p>

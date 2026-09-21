@@ -2,13 +2,13 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
-import { ApiError } from "@/lib/api";
+import { useAuth, SESSION_MESSAGE_KEY } from "@/lib/auth-context";
+import { ApiError, clearToken } from "@/lib/api";
 import PasswordInput from "@/components/PasswordInput";
 import { changePassword } from "./auth.api";
 
 export default function ChangePasswordPage() {
-  const { user, loading, refreshMe, logout } = useAuth();
+  const { user, loading, login, logout } = useAuth();
   const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -40,13 +40,36 @@ export default function ChangePasswordPage() {
       return;
     }
 
+    if (!user) return;
+
     setSubmitting(true);
     try {
       await changePassword(currentPassword, newPassword);
-      await refreshMe();
-      router.push("/dashboard/articles");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erreur lors du changement de mot de passe");
+      setSubmitting(false);
+      return;
+    }
+
+    // Un changement de mot de passe invalide tous les JWT déjà émis (token_version
+    // côté API), y compris celui de cette session : le jeton actuel n'est plus
+    // valable. On l'écarte et on ouvre une nouvelle session avec le nouveau mot de
+    // passe, pour que l'utilisateur poursuive sans repasser par /login.
+    clearToken();
+    try {
+      await login(user.email, newPassword);
+    } catch {
+      // Le mot de passe EST changé : seule la reconnexion automatique a échoué
+      // (ex: coupure réseau). On renvoie vers la connexion avec un message clair.
+      try {
+        window.sessionStorage.setItem(
+          SESSION_MESSAGE_KEY,
+          "Votre mot de passe a été modifié. Connectez-vous avec votre nouveau mot de passe."
+        );
+      } catch {
+        // ignore (stockage indisponible)
+      }
+      logout();
     } finally {
       setSubmitting(false);
     }
