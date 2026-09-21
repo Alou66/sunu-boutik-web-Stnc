@@ -14,7 +14,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [checked, setChecked] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const isLoginPage = pathname === "/admin/login";
+  // Pages accessibles sans jeton admin, comme /admin/login : le mot de passe
+  // oublié doit rester utilisable par un admin qui n'a justement plus de session.
+  const isPublicPage = pathname === "/admin/login" || pathname === "/admin/forgot-password";
 
   useEffect(() => {
     const stored = window.localStorage.getItem(ADMIN_SIDEBAR_COLLAPSED_KEY);
@@ -30,7 +32,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   useEffect(() => {
-    if (isLoginPage) {
+    if (isPublicPage) {
       setChecked(true);
       return;
     }
@@ -45,7 +47,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         clearAdminToken();
         router.replace("/admin/login");
       });
-  }, [isLoginPage, router]);
+  }, [isPublicPage, router]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -56,7 +58,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push("/admin/login");
   }
 
-  if (isLoginPage) return <>{children}</>;
+  if (isPublicPage) return <>{children}</>;
 
   if (!checked) {
     return (
