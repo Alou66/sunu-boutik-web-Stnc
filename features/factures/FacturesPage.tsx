@@ -10,21 +10,10 @@ import { UserLookup } from "@/features/employees/employees.types";
 import { ApiError } from "@/lib/api";
 import InvoiceStatusBadge, { STATUS_LABELS } from "./InvoiceStatusBadge";
 import { Invoice } from "./factures.types";
-import { deleteInvoice, fetchInvoicesExportBlob } from "./factures.api";
+import { deleteInvoice } from "./factures.api";
 import { useInvoices } from "./factures.hooks";
 
 const PAGE_SIZE = 20;
-
-function defaultDateFrom() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-}
-
-function defaultDateTo() {
-  const d = new Date();
-  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, "0")}-${String(last.getDate()).padStart(2, "0")}`;
-}
 
 export default function FacturesPage() {
   const router = useRouter();
@@ -43,10 +32,6 @@ export default function FacturesPage() {
   );
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState("");
-  const [exportFrom, setExportFrom] = useState(defaultDateFrom);
-  const [exportTo, setExportTo] = useState(defaultDateTo);
-  const [exporting, setExporting] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
   const [clientNamesById, setClientNamesById] = useState<Map<number, string>>(new Map());
   const [employees, setEmployees] = useState<UserLookup[]>([]);
 
@@ -102,24 +87,6 @@ export default function FacturesPage() {
     }
   }
 
-  async function handleExport() {
-    setExporting(true);
-    try {
-      const blob = await fetchInvoicesExportBlob(exportFrom, exportTo);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `EIP_factures_${exportFrom}_${exportTo}.zip`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setShowExportModal(false);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur export");
-    } finally {
-      setExporting(false);
-    }
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -156,16 +123,6 @@ export default function FacturesPage() {
               <option key={emp.id} value={emp.id}>{emp.full_name}</option>
             ))}
           </select>
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="flex items-center gap-1.5 border border-green-600 text-green-700 rounded-md px-3 py-2 text-sm font-medium hover:bg-green-50"
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-              <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" />
-              <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
-            </svg>
-            Télécharger
-          </button>
           <button
             onClick={() => router.push("/dashboard/factures/new")}
             className="bg-blue-600 text-white rounded-md px-3 sm:px-4 py-2 text-sm font-medium hover:bg-blue-700"
@@ -268,59 +225,6 @@ export default function FacturesPage() {
           </div>
         )}
       </div>
-
-      {/* Modal export Excel */}
-      {showExportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-base">Télécharger les factures (Excel)</h3>
-              <button onClick={() => setShowExportModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-600">Du</label>
-                <input
-                  type="date"
-                  value={exportFrom}
-                  onChange={(e) => setExportFrom(e.target.value)}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-600">Au</label>
-                <input
-                  type="date"
-                  value={exportTo}
-                  onChange={(e) => setExportTo(e.target.value)}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-            </div>
-
-            <p className="text-xs text-gray-400">
-              Fichier : <span className="font-mono">EIP_factures_{exportFrom}_{exportTo}.zip</span>
-            </p>
-
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={() => setShowExportModal(false)}
-                className="flex-1 border border-gray-300 rounded-lg py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleExport}
-                disabled={exporting}
-                className="flex-1 bg-green-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-60"
-              >
-                {exporting ? "Export en cours..." : "Télécharger"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { Client } from "@/features/clients/clients.types";
 import { fetchClient } from "@/features/clients/clients.api";
 import { fetchInvoice } from "./factures.api";
 import { Invoice } from "./factures.types";
+import { STATUS_LABELS } from "./InvoiceStatusBadge";
 
 function numberToWords(n: number): string {
   const units = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf",
@@ -67,6 +68,7 @@ export default function PrintFacturePage() {
   const totalQty = invoice.lines.reduce((s, l) => s + l.quantity, 0);
   const phones = [shop.phone, shop.phone2, shop.phone3].filter(Boolean).join(" - ");
   const amountWords = numberToWords(Math.round(invoice.total)) + " francs CFA";
+  const isCancelled = invoice.status === "cancelled";
 
   return (
     <>
@@ -119,6 +121,13 @@ export default function PrintFacturePage() {
         .ft-cell:last-child { border-right: none; }
         .ft-label { font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 2px; margin-bottom: 2px; text-align: center; }
         .ft-value { font-size: 11px; font-weight: bold; text-align: center; }
+
+        .status-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 5px; }
+        .status-row .bottom-text { margin-top: 0; }
+        .status-stamp {
+          flex-shrink: 0; color: #111;
+          font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase;
+        }
 
         .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; border: 1px solid #333; border-top: none; }
         .sig-cell { padding: 3px 6px; border-right: 1px solid #333; min-height: 36px; }
@@ -220,12 +229,12 @@ export default function PrintFacturePage() {
                 <div className="ft-value">{invoice.total.toLocaleString("fr-FR")}</div>
               </div>
               <div className="ft-cell">
-                <div className="ft-label">ACOMPTE</div>
-                <div className="ft-value">0</div>
+                <div className="ft-label">DÉJÀ PAYÉ</div>
+                <div className="ft-value">{invoice.amount_paid.toLocaleString("fr-FR")}</div>
               </div>
               <div className="ft-cell">
-                <div className="ft-label">NET À PAYER</div>
-                <div className="ft-value">{invoice.total.toLocaleString("fr-FR")}</div>
+                <div className="ft-label">RESTE À PAYER</div>
+                <div className="ft-value">{isCancelled ? "—" : invoice.balance_due.toLocaleString("fr-FR")}</div>
               </div>
             </div>
 
@@ -237,8 +246,11 @@ export default function PrintFacturePage() {
             </div>
 
             {/* Bas de page */}
-            <div className="bottom-text">
-              Arrêtée la présente facture à la somme de : <em>{amountWords}</em>
+            <div className="status-row">
+              <div className="bottom-text">
+                Arrêtée la présente facture à la somme de : <em>{amountWords}</em>
+              </div>
+              <span className="status-stamp">{STATUS_LABELS[invoice.status]}</span>
             </div>
             <div className="bottom-ref">
               <span>SUNU BOUTIK</span>

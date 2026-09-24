@@ -10,9 +10,10 @@ import InvoiceStatusBadge from "./InvoiceStatusBadge";
 import PaymentHistory from "./PaymentHistory";
 import PaymentModal from "./PaymentModal";
 import { cancelInvoice, deleteInvoice, fetchInvoice, fetchPdfBlob } from "./factures.api";
-import { Invoice, PdfFormat } from "./factures.types";
+import { Invoice } from "./factures.types";
+import { buildInvoiceCopiesPdf } from "./invoiceCopiesPdf";
 
-type ViewFormat = PdfFormat | "copies";
+type ViewFormat = "a4" | "copies";
 
 export default function FactureDetailPage() {
   const params = useParams();
@@ -29,8 +30,10 @@ export default function FactureDetailPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [actionError, setActionError] = useState("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const copiesRef = useRef<HTMLDivElement>(null);
 
   function loadInvoice() {
     Promise.all([
@@ -45,9 +48,9 @@ export default function FactureDetailPage() {
       .catch((err) => setError(err instanceof ApiError ? err.message : "Erreur de chargement"));
   }
 
-  function loadPdf(fmt: PdfFormat) {
+  function loadPdf() {
     setPdfLoading(true);
-    fetchPdfBlob(invoiceId, fmt)
+    fetchPdfBlob(invoiceId)
       .then((blob) => {
         const url = URL.createObjectURL(blob);
         setPdfBlobUrl((prev) => {
@@ -76,7 +79,7 @@ export default function FactureDetailPage() {
 
   useEffect(() => {
     if (format === "copies") return;
-    loadPdf(format);
+    loadPdf();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoiceId, format]);
 
@@ -85,6 +88,34 @@ export default function FactureDetailPage() {
       window.print();
     } else {
       iframeRef.current?.contentWindow?.print();
+    }
+  }
+
+  function triggerDownload(url: string, filename: string) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+  }
+
+  async function handleDownload() {
+    if (!invoice) return;
+    if (format === "a4") {
+      if (pdfBlobUrl) triggerDownload(pdfBlobUrl, `facture-${invoice.number}-a4.pdf`);
+      return;
+    }
+    if (!copiesRef.current) return;
+    setActionError("");
+    setDownloading(true);
+    try {
+      const blob = await buildInvoiceCopiesPdf(copiesRef.current);
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, `facture-${invoice.number}-2-exemplaires.pdf`);
+      URL.revokeObjectURL(url);
+    } catch {
+      setActionError("Impossible de générer le PDF");
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -124,6 +155,7 @@ export default function FactureDetailPage() {
   if (!invoice || !shop) return <p className="text-gray-400">Chargement...</p>;
 
   const printDisabled = format !== "copies" && (!pdfBlobUrl || pdfLoading);
+  const downloadDisabled = downloading || (format === "a4" && (!pdfBlobUrl || pdfLoading));
 
   return (
     <div className="space-y-4">
@@ -133,16 +165,8 @@ export default function FactureDetailPage() {
           {/* Format toggle */}
           <div className="flex rounded-md border border-gray-300 overflow-hidden text-sm">
             <button
-              onClick={() => setFormat("ticket")}
-              className={`px-3 py-1.5 font-medium transition-colors ${
-                format === "ticket" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              Ticket
-            </button>
-            <button
               onClick={() => setFormat("a4")}
-              className={`px-3 py-1.5 font-medium transition-colors border-l border-gray-300 ${
+              className={`px-3 py-1.5 font-medium transition-colors ${
                 format === "a4" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
               }`}
             >
@@ -190,15 +214,13 @@ export default function FactureDetailPage() {
           >
             Imprimer
           </button>
-          {format !== "copies" && pdfBlobUrl && !pdfLoading && (
-            <a
-              href={pdfBlobUrl}
-              download={`facture-${invoice.number}-${format}.pdf`}
-              className="border border-gray-300 rounded-md px-3 sm:px-4 py-2 text-sm font-medium hover:bg-gray-50"
-            >
-              Télécharger PDF
-            </a>
-          )}
+          <button
+            onClick={handleDownload}
+            disabled={downloadDisabled}
+            className="border border-gray-300 rounded-md px-3 sm:px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+          >
+            {downloading ? "Génération..." : "Télécharger PDF"}
+          </button>
         </div>
       </div>
 
@@ -236,7 +258,9 @@ export default function FactureDetailPage() {
 
       <div className="bg-white rounded-xl shadow overflow-x-auto print:mt-0">
         {format === "copies" ? (
-          <InvoiceCopiesView invoice={invoice} shop={shop} client={client} />
+          <div ref={copiesRef}>
+            <InvoiceCopiesView invoice={invoice} shop={shop} client={client} />
+          </div>
         ) : pdfLoading ? (
           <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
             Génération du PDF...
@@ -245,7 +269,7 @@ export default function FactureDetailPage() {
           <iframe
             ref={iframeRef}
             src={pdfBlobUrl}
-            className={format === "ticket" ? "w-full h-[60vh] sm:h-[600px]" : "w-full h-[70vh] sm:h-[800px]"}
+            className="w-full h-[70vh] sm:h-[800px]"
             title="Facture"
           />
         ) : (

@@ -54,5 +54,3 @@ export interface Payment {
   void_reason?: string | null;
   is_voided: boolean;
 }
-
-export type PdfFormat = "ticket" | "a4";

@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconChart, IconInbox, IconLogout, IconUsers, IconX } from "@/components/Icons";
+import {
+  IconChart,
+  IconChevronLeft,
+  IconChevronRight,
+  IconInbox,
+  IconLogout,
+  IconUsers,
+  IconX,
+} from "@/components/Icons";
 import { LogoMark } from "@/components/Logo";
 
 export const navItems = [
@@ -15,11 +23,13 @@ export default function AdminSidebar({
   collapsed,
   mobileOpen,
   onCloseMobile,
+  onToggleCollapsed,
   onLogout,
 }: {
   collapsed: boolean;
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  onToggleCollapsed: () => void;
   onLogout: () => void;
 }) {
   const pathname = usePathname();
@@ -84,7 +94,11 @@ export default function AdminSidebar({
           })}
         </nav>
 
-        <div className="border-t border-gray-800 px-4 py-4">
+        <div
+          className={`flex items-center justify-between gap-2 border-t border-gray-800 px-4 py-4 ${
+            collapsed ? "md:flex-col-reverse md:gap-3 md:px-0" : ""
+          }`}
+        >
           <button
             type="button"
             onClick={onLogout}
@@ -96,6 +110,16 @@ export default function AdminSidebar({
           >
             <IconLogout className="w-[18px] h-[18px] shrink-0" />
             <span className={collapsed ? "md:hidden" : ""}>Déconnexion</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-800 hover:text-white md:flex"
+            aria-label={collapsed ? "Déplier le menu" : "Réduire le menu"}
+            title={collapsed ? "Déplier le menu" : "Réduire le menu"}
+          >
+            {collapsed ? <IconChevronRight className="w-5 h-5" /> : <IconChevronLeft className="w-5 h-5" />}
           </button>
         </div>
       </aside>

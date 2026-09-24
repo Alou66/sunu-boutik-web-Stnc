@@ -74,11 +74,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         collapsed={collapsed}
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
+        onToggleCollapsed={toggleCollapsed}
         onLogout={logout}
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col admin-main-col">
-        <AdminHeader collapsed={collapsed} onToggleCollapsed={toggleCollapsed} onOpenMobile={() => setMobileOpen(true)} />
+        <AdminHeader onOpenMobile={() => setMobileOpen(true)} />
 
         <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-gray-50 px-4 py-6 sm:px-6 md:px-8 md:py-8">
           {children}

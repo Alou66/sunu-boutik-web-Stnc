@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Shop } from "@/lib/api";
 import { Client } from "@/features/clients/clients.types";
 import { Invoice } from "./factures.types";
+import { STATUS_LABELS } from "./InvoiceStatusBadge";
 
 function numberToWords(n: number): string {
   const units = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf",
@@ -226,13 +227,14 @@ function invoiceLineCells(line: Invoice["lines"][number]) {
 
 function InvoiceSummaryBlock({
   totalQty,
-  total,
+  invoice,
   amountWords,
 }: {
   totalQty: number;
-  total: number;
+  invoice: Invoice;
   amountWords: string;
 }) {
+  const isCancelled = invoice.status === "cancelled";
   return (
     <div className="copy-summary">
       <div className="footer-totals">
@@ -242,15 +244,15 @@ function InvoiceSummaryBlock({
         </div>
         <div className="ft-cell">
           <div className="ft-label">TOTAL</div>
-          <div className="ft-value">{total.toLocaleString("fr-FR")}</div>
+          <div className="ft-value">{invoice.total.toLocaleString("fr-FR")}</div>
         </div>
         <div className="ft-cell">
-          <div className="ft-label">ACOMPTE</div>
-          <div className="ft-value">0</div>
+          <div className="ft-label">DÉJÀ PAYÉ</div>
+          <div className="ft-value">{invoice.amount_paid.toLocaleString("fr-FR")}</div>
         </div>
         <div className="ft-cell">
-          <div className="ft-label">NET À PAYER</div>
-          <div className="ft-value">{total.toLocaleString("fr-FR")}</div>
+          <div className="ft-label">RESTE À PAYER</div>
+          <div className="ft-value">{isCancelled ? "—" : invoice.balance_due.toLocaleString("fr-FR")}</div>
         </div>
       </div>
 
@@ -260,8 +262,11 @@ function InvoiceSummaryBlock({
         <div className="sig-cell"><div className="sig-label">VISA CAISSIER</div></div>
       </div>
 
-      <div className="bottom-text">
-        Arrêtée la présente facture à la somme de : <em>{amountWords}</em>
+      <div className="status-row">
+        <div className="bottom-text">
+          Arrêtée la présente facture à la somme de : <em>{amountWords}</em>
+        </div>
+        <span className="status-stamp">{STATUS_LABELS[invoice.status]}</span>
       </div>
     </div>
   );
@@ -289,7 +294,7 @@ export default function InvoiceCopiesView({
   const dateObj = new Date(invoice.created_at);
   const dateStr = dateObj.toLocaleDateString("fr-FR");
   const heureStr = dateObj.toLocaleTimeString("fr-FR");
-  // Même règle que le PDF Ticket/A4 (backend: invoices.py) : nom + téléphone du client lié,
+  // Même règle que le PDF A4 (backend: invoices.py) : nom + téléphone du client lié,
   // sinon le nom libre saisi sur la facture.
   const clientLabel = client ? client.name + (client.phone ? ` - ${client.phone}` : "") : invoice.client_name || "Client Divers";
   const clientAddress = client?.address || "";
@@ -404,6 +409,14 @@ export default function InvoiceCopiesView({
         .invoice-copies .ft-label { font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 2px; margin-bottom: 2px; text-align: center; }
         .invoice-copies .ft-value { font-size: 11px; font-weight: bold; text-align: center; }
 
+        /* Statut de paiement (texte seul, sans couleur ni cadre) */
+        .invoice-copies .status-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 5px; }
+        .invoice-copies .status-row .bottom-text { margin-top: 0; }
+        .invoice-copies .status-stamp {
+          flex-shrink: 0; color: #111;
+          font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase;
+        }
+
         .invoice-copies .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; border: 1px solid #333; border-top: none; }
         .invoice-copies .sig-cell { padding: 3px 6px; border-right: 1px solid #333; min-height: 36px; min-width: 0; }
         .invoice-copies .sig-cell:last-child { border-right: none; }
@@ -437,7 +450,7 @@ export default function InvoiceCopiesView({
               </tbody>
             </table>
           </div>
-          <InvoiceSummaryBlock totalQty={totalQty} total={invoice.total} amountWords={amountWords} />
+          <InvoiceSummaryBlock totalQty={totalQty} invoice={invoice} amountWords={amountWords} />
           <InvoiceSignoffBlock />
         </div>
       </div>
@@ -475,7 +488,7 @@ export default function InvoiceCopiesView({
 
                 {isLastPage && (
                   <>
-                    <InvoiceSummaryBlock totalQty={totalQty} total={invoice.total} amountWords={amountWords} />
+                    <InvoiceSummaryBlock totalQty={totalQty} invoice={invoice} amountWords={amountWords} />
                     <InvoiceSignoffBlock />
                   </>
                 )}
