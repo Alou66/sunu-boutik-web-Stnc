@@ -83,7 +83,7 @@ async function request<T>(
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
-  if (options.body && !(options.body instanceof FormData)) {
+   if (options.body) {
     headers["Content-Type"] = "application/json";
   }
   if (token) {
@@ -136,8 +136,6 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
-  postForm: <T>(path: string, formData: FormData) =>
-    request<T>(path, { method: "POST", body: formData }),
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "PATCH", body: body ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),

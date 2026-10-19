@@ -19,7 +19,6 @@ export default function RegisterPage() {
     full_name: "",
     email: "",
   });
-  const [logo, setLogo] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -34,7 +33,7 @@ export default function RegisterPage() {
     setError("");
     setSubmitting(true);
     try {
-      const message = await register({ ...form, logo });
+      const message = await register(form);
       setSuccessMessage(message);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erreur lors de l'inscription");
@@ -166,18 +165,6 @@ export default function RegisterPage() {
               onChange={update("email")}
               className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Logo de la boutique <span className="text-gray-400">(optionnel)</span>
-            </label>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={(e) => setLogo(e.target.files?.[0] ?? null)}
-              className="w-full text-sm text-gray-600 rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-400 mt-1">Il apparaîtra sur vos factures. PNG, JPG ou WEBP, 2 Mo max.</p>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
 
