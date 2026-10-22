@@ -190,7 +190,7 @@ export default function FacturesPage() {
                   ) : (
                     <button
                       onClick={() => router.push(`/dashboard/factures/${inv.id}/edit`)}
-                      className="text-blue-600 hover:underline"
+                      className="inline-flex items-center justify-center rounded-md border border-blue-200 bg-blue-600 px-2 py-1 text-xs font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 active:scale-[0.98]"
                     >
                       Modifier
                     </button>

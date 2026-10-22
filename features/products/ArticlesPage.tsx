@@ -13,6 +13,7 @@ import { useAllCategories } from "@/features/categories/categories.hooks";
 import { Product } from "./products.types";
 import { createProduct, deleteProduct, updateProduct } from "./products.api";
 import { useAllProducts, useProducts } from "./products.hooks";
+import { createStockAdjustment } from "./stock-adjustment.api";
 
 const emptyForm = {
   name: "",
@@ -41,6 +42,15 @@ export default function ArticlesPage() {
   const [editingQuantitySecondaire, setEditingQuantitySecondaire] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
+  const [adjustForm, setAdjustForm] = useState({
+    unit_target: "principale" as "principale" | "secondaire",
+    adjustment_type: "entry" as "entry" | "exit",
+    quantity: "",
+    reason: "",
+  });
+  const [adjustError, setAdjustError] = useState("");
+  const [adjustSubmitting, setAdjustSubmitting] = useState(false);
 
   function onSearchChange(value: string) {
     setSearch(value);
@@ -182,6 +192,55 @@ export default function ArticlesPage() {
     }
   }
 
+  function openAdjust(product: Product) {
+    setAdjustingProduct(product);
+    setAdjustForm({
+      unit_target: product.is_transformable ? "principale" : "principale",
+      adjustment_type: "entry",
+      quantity: "",
+      reason: "",
+    });
+    setAdjustError("");
+  }
+
+  function closeAdjust() {
+    setAdjustingProduct(null);
+    setAdjustError("");
+    setAdjustForm({ unit_target: "principale", adjustment_type: "entry", quantity: "", reason: "" });
+  }
+
+  async function submitAdjust(e: React.FormEvent) {
+    e.preventDefault();
+    if (!adjustingProduct) return;
+    setAdjustError("");
+    const qty = Number(adjustForm.quantity);
+    if (Number.isNaN(qty) || qty <= 0) {
+      setAdjustError("La quantité doit être strictement positive");
+      return;
+    }
+    if (!adjustForm.reason.trim()) {
+      setAdjustError("Le motif est obligatoire");
+      return;
+    }
+    setAdjustSubmitting(true);
+    try {
+      await createStockAdjustment({
+        product_id: adjustingProduct.id,
+        unit_target: adjustingProduct.is_transformable ? adjustForm.unit_target : "principale",
+        adjustment_type: adjustForm.adjustment_type,
+        quantity: qty,
+        reason: adjustForm.reason.trim(),
+      });
+      closeAdjust();
+      await reload();
+      setError("");
+    } catch (err) {
+      setAdjustError(err instanceof ApiError ? err.message : "Erreur lors de l'ajustement");
+    } finally {
+      setAdjustSubmitting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -253,13 +312,13 @@ export default function ArticlesPage() {
                   )}
                 </td>
                 <td className="px-4 py-3 text-right space-x-3 whitespace-nowrap">
-                  <Link href={`/dashboard/approvisionnements/new?product_id=${p.id}`} className="text-green-600 hover:underline">
-                    Approvisionner
-                  </Link>
-                  <button onClick={() => openEdit(p)} className="text-blue-600 hover:underline">
+                  <button onClick={() => openAdjust(p)}     className="inline-flex items-center justify-center rounded-md border border-green-200 bg-green-800 px-2 py-1 text-xs font-medium text-white transition-colors duration-200 hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-1 active:scale-[0.98]">
+                    Ajuster le stock
+                  </button>
+                  <button onClick={() => openEdit(p)}     className="inline-flex items-center justify-center rounded-md border border-blue-200 bg-blue-600 px-2 py-1 text-xs font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 active:scale-[0.98]">
                     Modifier
                   </button>
-                  <button onClick={() => onDelete(p.id)} className="text-red-600 hover:underline">
+                  <button onClick={() => onDelete(p.id)}     className="inline-flex items-center justify-center rounded-md border border-red-200 bg-red-600 px-2 py-1 text-xs font-medium text-white transition-colors duration-200 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1 active:scale-[0.98]">
                     Supprimer
                   </button>
                 </td>
@@ -352,7 +411,7 @@ export default function ArticlesPage() {
             </div>
 
             {editingProduct ? (
-              <div className="bg-gray-50 rounded-md px-3 py-2 flex items-center justify-between">
+              <div className="bg-gray-50 rounded-md px-3 py-2">
                 <div>
                   <p className="text-xs text-gray-500">Stock actuel</p>
                   <p className="text-sm font-medium">
@@ -362,12 +421,6 @@ export default function ArticlesPage() {
                     )}
                   </p>
                 </div>
-                <Link
-                  href={`/dashboard/approvisionnements/new?product_id=${editingProduct.id}`}
-                  className="text-sm text-blue-600 hover:underline whitespace-nowrap"
-                >
-                  Approvisionner
-                </Link>
               </div>
             ) : (
               <p className="text-xs text-gray-400">
@@ -482,6 +535,87 @@ export default function ArticlesPage() {
                 onClick={closeModal}
                 className="px-4 py-2 text-gray-500 hover:text-gray-800"
               >
+                Annuler
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {adjustingProduct && (
+        <Modal title="Ajuster le stock" onClose={closeAdjust}>
+          <form onSubmit={submitAdjust} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Produit</label>
+              <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900">
+                {adjustingProduct.name}
+              </div>
+            </div>
+            {adjustingProduct.is_transformable && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Forme</label>
+                <select
+                  value={adjustForm.unit_target}
+                  onChange={(e) => setAdjustForm({ ...adjustForm, unit_target: e.target.value as "principale" | "secondaire" })}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                >
+                  <option value="principale">{adjustingProduct.unit}</option>
+                  <option value="secondaire">{adjustingProduct.unit_secondaire}</option>
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Stock actuel</label>
+              <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900">
+                {adjustForm.unit_target === "secondaire"
+                  ? `${adjustingProduct.quantity_secondaire} ${adjustingProduct.unit_secondaire || ""}`
+                  : `${adjustingProduct.quantity} ${adjustingProduct.is_transformable ? adjustingProduct.unit : ""}`}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+                <select
+                  value={adjustForm.adjustment_type}
+                  onChange={(e) => setAdjustForm({ ...adjustForm, adjustment_type: e.target.value as "entry" | "exit" })}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                >
+                  <option value="entry">Entrée</option>
+                  <option value="exit">Sortie</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Quantité</label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={adjustForm.quantity}
+                  onChange={(e) => setAdjustForm({ ...adjustForm, quantity: e.target.value })}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Motif</label>
+              <input
+                type="text"
+                value={adjustForm.reason}
+                onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                placeholder="Motif obligatoire"
+              />
+            </div>
+            {adjustError && <p className="text-sm text-red-600">{adjustError}</p>}
+            <div className="flex gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={adjustSubmitting}
+                className="flex-1 bg-blue-600 text-white rounded-md py-2 font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {adjustSubmitting ? "Enregistrement..." : "Enregistrer"}
+              </button>
+              <button type="button" onClick={closeAdjust} className="px-4 py-2 text-gray-500 hover:text-gray-800">
                 Annuler
               </button>
             </div>

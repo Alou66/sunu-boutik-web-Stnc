@@ -37,6 +37,7 @@ export const navItems = [
   { href: "/dashboard/categories", label: "Catégories", Icon: IconTag },
   { href: "/dashboard/articles", label: "Articles", Icon: IconBox },
   { href: "/dashboard/approvisionnements", label: "Approvisionnements", Icon: IconTruck },
+  { href: "/dashboard/initialisation-stock", label: "Initialisation du stock", Icon: IconBox },
   { href: "/dashboard/fournisseurs", label: "Fournisseurs", Icon: IconBuilding },
   { href: "/dashboard/transformations", label: "Transformations", Icon: IconSwap },
   { href: "/dashboard/clients", label: "Clients", Icon: IconUsers },

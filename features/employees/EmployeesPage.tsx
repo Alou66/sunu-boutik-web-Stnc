@@ -176,13 +176,13 @@ export default function EmployeesPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right space-x-3">
-                  <button onClick={() => openEdit(e)} className="text-blue-600 hover:underline">
+                  <button onClick={() => openEdit(e)}     className="inline-flex items-center justify-center rounded-md border border-blue-200 bg-blue-600 px-2 py-1 text-xs font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 active:scale-[0.98]">
                     Voir / Réinitialiser
                   </button>
-                  <button onClick={() => onToggleActive(e)} className="text-amber-600 hover:underline">
+                  <button onClick={() => onToggleActive(e)}     className="inline-flex items-center justify-center rounded-md border border-amber-200 bg-amber-600 px-2 py-1 text-xs font-medium text-white transition-colors duration-200 hover:bg-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-1 active:scale-[0.98]">
                     {e.is_active ? "Désactiver" : "Activer"}
                   </button>
-                  <button onClick={() => onDelete(e.id)} className="text-red-600 hover:underline">
+                  <button onClick={() => onDelete(e.id)}     className="inline-flex items-center justify-center rounded-md border border-red-200 bg-red-600 px-2 py-1 text-xs font-medium text-white transition-colors duration-200 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1 active:scale-[0.98]">
                     Supprimer
                   </button>
                 </td>

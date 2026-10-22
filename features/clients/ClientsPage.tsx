@@ -139,10 +139,10 @@ export default function ClientsPage() {
                 <td className="px-4 py-3 text-gray-500">{c.phone || "-"}</td>
                 <td className="px-4 py-3 text-gray-500">{c.address || "-"}</td>
                 <td className="px-4 py-3 text-right space-x-3">
-                  <button onClick={() => openEdit(c)} className="text-blue-600 hover:underline">
+                  <button onClick={() => openEdit(c)}     className="inline-flex items-center justify-center rounded-md border border-blue-200 bg-blue-600 px-2 py-1 text-xs font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 active:scale-[0.98]">
                     Modifier
                   </button>
-                  <button onClick={() => onDelete(c.id)} className="text-red-600 hover:underline">
+                  <button onClick={() => onDelete(c.id)}     className="inline-flex items-center justify-center rounded-md border border-red-200 bg-red-600 px-2 py-1 text-xs font-medium text-white transition-colors duration-200 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1 active:scale-[0.98]">
                     Supprimer
                   </button>
                 </td>
